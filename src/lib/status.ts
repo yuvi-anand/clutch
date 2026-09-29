@@ -4,15 +4,18 @@ import type { ModelOption, Status } from "./types";
 
 export async function publicStatus(): Promise<Status> {
   const c = readConfig();
+  const engine = c.aiCommand ? "command" : c.anthropicApiKey ? "api" : "none";
   let models: ModelOption[] = [];
-  if (c.anthropicApiKey) models = await availableModels(c.anthropicApiKey).catch(() => []);
+  if (engine === "api") models = await availableModels(c.anthropicApiKey!).catch(() => []);
+  if (engine === "command") models = [{ id: "command", label: "Local AI command", note: "Runs on this computer, no API cost" }];
   return {
     canvasConnected: Boolean(c.canvasBaseUrl && c.canvasToken),
     canvasBaseUrl: c.canvasBaseUrl ?? null,
-    aiConfigured: Boolean(c.anthropicApiKey),
-    model: c.model ?? models[0]?.id ?? "",
+    aiConfigured: engine !== "none",
+    engine,
+    model: engine === "command" ? "command" : (c.model ?? models[0]?.id ?? ""),
     models,
     canvasFromEnv: Boolean(process.env.CANVAS_TOKEN),
-    aiFromEnv: Boolean(process.env.ANTHROPIC_API_KEY),
+    aiFromEnv: Boolean(process.env.ANTHROPIC_API_KEY || process.env.AI_COMMAND),
   };
 }

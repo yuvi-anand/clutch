@@ -153,8 +153,18 @@ export default function ConnectPage() {
         <section className="card p-6">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">2. AI model</h2>
-            {status.aiConfigured && <span className={OK}>Key saved</span>}
+            {status.engine === "command" ? (
+              <span className={OK}>Using local AI command</span>
+            ) : (
+              status.aiConfigured && <span className={OK}>Key saved</span>
+            )}
           </div>
+          {status.engine === "command" && (
+            <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+              Guides, quizzes and plans run through the local AI command in your config, so no API key or credits are needed. An API key
+              is only used if you remove that command.
+            </p>
+          )}
           <label className="mt-4 block">
             <span className="text-sm font-medium">Anthropic API key</span>
             <input
@@ -171,7 +181,7 @@ export default function ConnectPage() {
             <a className="link" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
               console.anthropic.com ↗
             </a>
-            . A study guide usually costs $0.05–$0.40, depending on how much material you pick.
+            . The account also needs prepaid credits (Plans & Billing), or requests are refused. A study guide usually costs $0.20–$0.50, depending on how much material you pick.
           </p>
           <fieldset className="mt-4">
             <legend className="text-sm font-medium">Model</legend>

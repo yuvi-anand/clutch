@@ -15,6 +15,8 @@ export type Status = {
   canvasConnected: boolean;
   canvasBaseUrl: string | null;
   aiConfigured: boolean;
+  /** "command" = the local AI command from your config; "api" = API key. */
+  engine: "api" | "command" | "none";
   model: string;
   models: ModelOption[];
   canvasFromEnv: boolean;

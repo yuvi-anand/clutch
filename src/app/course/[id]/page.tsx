@@ -189,7 +189,7 @@ function CourseScreen({ courseId }: { courseId: number }) {
               value={topics}
               onChange={(e) => setTopics(e.target.value)}
               className="input mt-2"
-              placeholder="e.g. “recurrences, I never know which case applies” or “everything for Tuesday's quiz”"
+              placeholder="e.g. “integration by parts, I always pick the wrong u” or “everything for Tuesday's quiz”"
             />
             <button className="btn mt-2 w-full" disabled={!topics.trim() || suggesting || !aiReady} onClick={() => suggest(topics)}>
               {suggesting ? (
@@ -235,10 +235,20 @@ function CourseScreen({ courseId }: { courseId: number }) {
               </label>
             )}
             <label className="mt-4 flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={visual} onChange={(e) => setVisual(e.target.checked)} className="mt-1 accent-indigo-600" />
-              <span>
+              <input
+                type="checkbox"
+                checked={visual && status?.engine !== "command"}
+                disabled={status?.engine === "command"}
+                onChange={(e) => setVisual(e.target.checked)}
+                className="mt-1 accent-indigo-600"
+              />
+              <span className={status?.engine === "command" ? "opacity-60" : ""}>
                 Read PDFs visually
-                <span className="block text-xs muted">Better for math, diagrams and scanned slides. Costs several times more.</span>
+                <span className="block text-xs muted">
+                  {status?.engine === "command"
+                    ? "Needs an API key. Your local AI command reads slides as text."
+                    : "Better for math, diagrams and scanned slides. Costs several times more."}
+                </span>
               </span>
             </label>
             <button className="btn btn-primary mt-5 w-full" disabled={!selected.size || !aiReady} onClick={generate}>

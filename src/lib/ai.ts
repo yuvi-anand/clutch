@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readConfig } from "./config";
+import { extractJson, runCommand } from "./localEngine";
 import { currentModel } from "./models";
 
 export type Effort = "low" | "medium" | "high";
@@ -46,7 +47,8 @@ function costOf(m: Anthropic.Beta.BetaMessage): number {
  * material about security can trip them), the API retries on a fallback model.
  */
 export async function runModel(o: RunOptions): Promise<RunResult> {
-  const { anthropicApiKey } = readConfig();
+  const { anthropicApiKey, aiCommand } = readConfig();
+  if (aiCommand) return runLocal(aiCommand, o);
   if (!anthropicApiKey) throw new Error("Add your Anthropic API key on the Connect page first.");
   const client = new Anthropic({ apiKey: anthropicApiKey });
   const stream = client.beta.messages.stream(
@@ -76,4 +78,27 @@ export async function runModel(o: RunOptions): Promise<RunResult> {
   }
   const text = message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
   return { text, model: message.model, cost: costOf(message), truncated: message.stop_reason === "max_tokens" };
+}
+
+/** Same call through the local command. JSON replies get one retry if they don't parse. */
+async function runLocal(command: string, o: RunOptions): Promise<RunResult> {
+  for (let attempt = 0; ; attempt++) {
+    const text = await runCommand(command, {
+      system: o.system,
+      content: o.content,
+      effort: o.effort,
+      schema: o.format?.schema,
+      signal: o.signal,
+      onText: o.onText,
+      onThinking: o.onThinking,
+    });
+    if (!o.format) return { text, model: "local command", cost: 0, truncated: false };
+    const json = extractJson(text);
+    try {
+      JSON.parse(json);
+      return { text: json, model: "local command", cost: 0, truncated: false };
+    } catch {
+      if (attempt >= 1) throw new Error("The local AI command didn't return valid JSON. Try again.");
+    }
+  }
 }

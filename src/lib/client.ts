@@ -101,7 +101,7 @@ export function fmtAgo(iso: string): string {
   return fmtShortDate(iso);
 }
 
-export const money = (n: number) => (n < 0.01 ? "<$0.01" : `$${n.toFixed(2)}`);
+export const money = (n: number) => (n === 0 ? "no API cost" : n < 0.01 ? "<$0.01" : `$${n.toFixed(2)}`);
 
 /** A heading without its dates, so it works as a study topic. */
 export const topicFrom = stripDates;

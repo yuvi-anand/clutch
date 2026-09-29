@@ -54,7 +54,7 @@ export function FeedbackButton() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 className="input mt-4"
-                placeholder="e.g. The plan was great, but the CS 3000 guide skipped the recursion tree method…"
+                placeholder="e.g. The plan was great, but the biology guide skipped enzyme kinetics…"
               />
             )}
             {state === "error" && <p className="mt-2 text-sm text-red-600">Couldn't save that. Is the app still running?</p>}

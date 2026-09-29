@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { demoBlocked } from "@/lib/demo";
 import { forget } from "@/lib/cache";
 import { CanvasError, checkCanvas } from "@/lib/canvas";
 import { normalizeBaseUrl, readConfig, updateConfig } from "@/lib/config";
@@ -19,6 +20,8 @@ const Body = z.object({
 export async function POST(req: Request) {
   const denied = guard(req);
   if (denied) return denied;
+  const blocked = demoBlocked();
+  if (blocked) return blocked;
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Invalid request" }, { status: 400 });
   const b = parsed.data;

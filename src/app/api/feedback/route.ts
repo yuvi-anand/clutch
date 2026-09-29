@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { demoBlocked } from "@/lib/demo";
 import { guard } from "@/lib/http";
 import { appendFeedback } from "@/lib/store";
 
@@ -15,6 +16,8 @@ const Body = z.object({
 export async function POST(req: Request) {
   const denied = guard(req);
   if (denied) return denied;
+  const blocked = demoBlocked();
+  if (blocked) return blocked;
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Invalid feedback" }, { status: 400 });
   appendFeedback({ at: new Date().toISOString(), ...parsed.data });

@@ -34,9 +34,9 @@ npm run dev
 Open http://127.0.0.1:3100 and go to **Connect**:
 
 1. **Canvas access token.** In Canvas, open Account → Settings, scroll to Approved Integrations, click **+ New Access Token**, and paste the token into Clutch.
-2. **Anthropic API key.** Create one at [console.anthropic.com](https://console.anthropic.com/settings/keys). A study guide usually costs $0.05–$0.40 depending on how much material you pick. The app shows the cost of each one.
+2. **Anthropic API key.** Create one at [console.anthropic.com](https://console.anthropic.com/settings/keys). The account needs prepaid credits (Plans & Billing). A study guide usually costs $0.20–$0.50 depending on how much material you pick. The app shows the cost of each one.
 
-For everyday use, `npm run build && npm start` runs a faster production build at the same address. You can also set everything in `.env.local` instead of the Connect page (see `.env.example`).
+For everyday use, `npm run build && npm start` runs a faster production build at the same address. To look around with made-up sample data and no accounts, run `DEMO_MODE=1 npm run dev`. You can also set everything in `.env.local` instead of the Connect page (see `.env.example`).
 
 ## Privacy and security
 

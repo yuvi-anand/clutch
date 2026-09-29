@@ -1,4 +1,5 @@
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { demoBlocked } from "@/lib/demo";
 import { z } from "zod";
 import { runModel } from "@/lib/ai";
 import { guard, jsonError } from "@/lib/http";
@@ -12,6 +13,8 @@ const Body = z.object({ courseId: z.number().int(), topics: z.string().trim().mi
 export async function POST(req: Request) {
   const denied = guard(req);
   if (denied) return denied;
+  const blocked = demoBlocked();
+  if (blocked) return blocked;
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Describe what you want to study first." }, { status: 400 });
   try {

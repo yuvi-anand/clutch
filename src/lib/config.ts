@@ -8,6 +8,8 @@ export type Config = {
   canvasBaseUrl?: string;
   canvasToken?: string;
   anthropicApiKey?: string;
+  /** Optional command-line AI tool to use instead of the API (see localEngine.ts). */
+  aiCommand?: string;
   /** Model the student picked. Unset means "newest top-tier model". */
   model?: string;
   /** Per-course override of the "current semester" guess. */
@@ -30,6 +32,7 @@ export function readConfig(): Config {
     canvasBaseUrl: process.env.CANVAS_BASE_URL || f.canvasBaseUrl,
     canvasToken: process.env.CANVAS_TOKEN || f.canvasToken,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY || f.anthropicApiKey,
+    aiCommand: process.env.AI_COMMAND || f.aiCommand,
     model: process.env.AI_MODEL || f.model,
   };
 }

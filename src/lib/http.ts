@@ -17,14 +17,26 @@ export function guard(req: Request): Response | null {
   return null;
 }
 
+/** The human-readable message inside an API error body, instead of the raw JSON. */
+function apiDetail(e: InstanceType<typeof Anthropic.APIError>): string {
+  const body = e.error as { error?: { message?: unknown } } | undefined;
+  return typeof body?.error?.message === "string" ? body.error.message : e.message;
+}
+
 export function errorMessage(e: unknown): string {
   if (e instanceof Anthropic.AuthenticationError) return "The Anthropic API rejected your key. Check it on the Connect page.";
   if (e instanceof Anthropic.PermissionDeniedError) return "Your Anthropic API key doesn't have access to that model.";
   if (e instanceof Anthropic.RateLimitError) return "Hit the API rate limit. Wait a minute and try again.";
-  if (e instanceof Anthropic.BadRequestError) return `The AI service couldn't take this request: ${e.message}`;
+  if (e instanceof Anthropic.BadRequestError) {
+    const detail = apiDetail(e);
+    if (/credit balance is too low/i.test(detail)) {
+      return "Your Anthropic account is out of credits, so nothing was generated (and nothing was charged). Add credits at console.anthropic.com under Plans & Billing, then try again.";
+    }
+    return `The AI service couldn't take this request: ${detail}`;
+  }
   if (e instanceof Anthropic.InternalServerError) return "The AI service is overloaded or having trouble right now. Try again in a minute.";
   if (e instanceof Anthropic.APIConnectionError) return "Couldn't reach the Anthropic API. Check your internet connection.";
-  if (e instanceof Anthropic.APIError) return `AI service error ${e.status}: ${e.message}`;
+  if (e instanceof Anthropic.APIError) return `AI service error ${e.status}: ${apiDetail(e)}`;
   if (e instanceof Error) return e.message;
   return String(e);
 }

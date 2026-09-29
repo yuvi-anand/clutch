@@ -1,4 +1,5 @@
 import { planContext } from "@/lib/agenda";
+import { DEMO, demoBlocked, demoPlan } from "@/lib/demo";
 import { runModel } from "@/lib/ai";
 import { guard, ndjson } from "@/lib/http";
 import { PLAN_SYSTEM, planPrompt } from "@/lib/prompts";
@@ -12,12 +13,15 @@ const fmt = (d: Date) => d.toLocaleDateString("en-US", { weekday: "long", month:
 export async function GET(req: Request) {
   const denied = guard(req);
   if (denied) return denied;
+  if (DEMO) return Response.json({ plan: demoPlan() });
   return Response.json({ plan: latestPlan() });
 }
 
 export async function POST(req: Request) {
   const denied = guard(req);
   if (denied) return denied;
+  const blocked = demoBlocked();
+  if (blocked) return blocked;
   return ndjson(req, async (send, signal) => {
     send({ t: "status", text: "Reading your courses…" });
     const context = await planContext();

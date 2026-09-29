@@ -1,9 +1,11 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { demoBlocked } from "@/lib/demo";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { courseUpcoming, describeItem } from "@/lib/agenda";
 import { runModel } from "@/lib/ai";
 import { canvas } from "@/lib/canvas";
+import { readConfig } from "@/lib/config";
 import { courseLabel } from "@/lib/courses";
 import { guard, ndjson } from "@/lib/http";
 import { gatherSources, getCourseMaterials } from "@/lib/materials";
@@ -38,10 +40,13 @@ function cleanQuestions(raw: z.infer<typeof QuizSchema>["questions"]): QuizQuest
 export async function POST(req: Request) {
   const denied = guard(req);
   if (denied) return denied;
+  const blocked = demoBlocked();
+  if (blocked) return blocked;
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Pick at least one material first." }, { status: 400 });
   const b = parsed.data;
 
+  if (b.visual && readConfig().aiCommand) b.visual = false;
   return ndjson(req, async (send, signal) => {
     send({ t: "status", text: "Loading the course from Canvas…" });
     const [mats, course] = await Promise.all([getCourseMaterials(b.courseId), canvas.course(b.courseId)]);
