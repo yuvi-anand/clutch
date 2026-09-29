@@ -1,0 +1,8 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.env*.local
+.env
+# Your Canvas token, API key, cached course text, guides and feedback live here.
+data/
