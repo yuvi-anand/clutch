@@ -24,6 +24,18 @@ const link: Components["a"] = ({ href, children }) =>
 const blockComponents: Components = { a: link };
 const inlineComponents: Components = { a: link, p: ({ children }) => <span>{children}</span> };
 
+/**
+ * Models often write display math as a single line `$$ … $$`, which Markdown
+ * parses as inline math. Put those on their own lines (outside code blocks)
+ * so they render as centered equations.
+ */
+function normalizeMath(md: string): string {
+  return md
+    .split(/(^```[\s\S]*?^```)/m)
+    .map((part, i) => (i % 2 ? part : part.replace(/^[ \t]*\$\$(.+?)\$\$[ \t]*$/gm, (_, m: string) => `\n$$\n${m.trim()}\n$$\n`)))
+    .join("");
+}
+
 const PROSE =
   "prose prose-stone max-w-none dark:prose-invert prose-headings:scroll-mt-20 prose-headings:tracking-tight prose-a:text-indigo-600 dark:prose-a:text-indigo-400 prose-pre:bg-stone-900 prose-pre:text-stone-100 prose-table:text-sm prose-li:my-0.5";
 
@@ -34,7 +46,7 @@ export function Markdown({ children, inline = false, className = "" }: { childre
       rehypePlugins={rehypePlugins}
       components={inline ? inlineComponents : blockComponents}
     >
-      {children}
+      {inline ? children : normalizeMath(children)}
     </ReactMarkdown>
   );
   return inline ? <span className={className}>{md}</span> : <div className={`${PROSE} ${className}`}>{md}</div>;
