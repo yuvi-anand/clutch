@@ -1,5 +1,6 @@
 "use client";
 
+import { stripDates } from "./text";
 import type { GenerateRequest, StreamEvent } from "./types";
 
 // Browser-side helpers: API calls, streaming, and date/number formatting.
@@ -102,13 +103,5 @@ export function fmtAgo(iso: string): string {
 
 export const money = (n: number) => (n < 0.01 ? "<$0.01" : `$${n.toFixed(2)}`);
 
-/** Strip dates and "next week" from a heading so it works as a study topic. */
-export function topicFrom(title: string): string {
-  return title
-    .replace(/\b(next|this)\s+week\b/gi, "")
-    .replace(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?/gi, "")
-    .replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(st|nd|rd|th)?\b/gi, "")
-    .replace(/[\s,:–-]+$/g, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
+/** A heading without its dates, so it works as a study topic. */
+export const topicFrom = stripDates;

@@ -4,6 +4,7 @@ import { readConfig } from "./config";
 import { courseColor, courseLabel, courseScore, splitCourses } from "./courses";
 import { htmlToMarkdown } from "./extract";
 import { modulesOf } from "./materials";
+import { eventMentions, stripDates } from "./text";
 import type { DashCourse, DashItem, Dashboard, ItemStatus } from "./types";
 
 // Builds the "where do I stand" view from Canvas: deadlines, missing work,
@@ -85,10 +86,6 @@ function assignmentItem(courseId: number, a: CanvasAssignment): DashItem {
   };
 }
 
-const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-const EVENT =
-  /\b((?:mid-?term|final)(?:\s+exam)?(?:\s*#?\s*\d)?|exam(?:\s*#?\s*\d)?|quiz(?:\s*#?\s*\d+)?|(?:in[- ]person\s+)?lab(?:\s*#?\s*\d+)?|practical(?:\s*#?\s*\d+)?|test\s*#?\s*\d+)\b([^.;\n]{0,50}?)\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi;
-
 export function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -100,15 +97,7 @@ function inferDate(month: number, day: number, now: Date): string {
 }
 
 function datedMentions(text: string, now: Date) {
-  const out: { label: string; date: string; snippet: string }[] = [];
-  for (const m of text.matchAll(EVENT)) {
-    const month = MONTHS.indexOf(m[3].slice(0, 3).toLowerCase());
-    const day = Number(m[4]);
-    if (month < 0 || day < 1 || day > 31) continue;
-    const label = m[1].trim().replace(/\s+/g, " ");
-    out.push({ label: label[0].toUpperCase() + label.slice(1), date: inferDate(month, day, now), snippet: m[0].trim() });
-  }
-  return out;
+  return eventMentions(text).map((e) => ({ label: e.label, date: inferDate(e.month, e.day, now), snippet: e.snippet }));
 }
 
 function notesFor(cd: CourseData, now: Date): DashItem[] {
@@ -134,7 +123,7 @@ function notesFor(cd: CourseData, now: Date): DashItem[] {
     for (const item of mod.items ?? []) {
       if (item.type !== "SubHeader") continue;
       for (const hit of datedMentions(item.title, now)) {
-        add(item.title.replace(/^\s*(\d+|[a-z])[.)]\s+/i, "").trim(), hit.date, "module", `${mod.name.trim()}: “${item.title.trim()}”`);
+        add(stripDates(item.title), hit.date, "module", `${mod.name.trim()}: “${item.title.trim()}”`);
       }
     }
   }
