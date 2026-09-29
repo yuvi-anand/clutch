@@ -101,6 +101,19 @@ export type CourseView = {
   upcoming: DashItem[];
 };
 
+/** The text the app reads out of one course material (shown by "preview"). */
+export type MaterialPreview = {
+  title: string;
+  text: string;
+  truncated: boolean;
+  chars: number;
+  approxTokens: number;
+  units?: number;
+  unitLabel?: string;
+  cached: boolean;
+  lowText: boolean;
+};
+
 export type Mode = "guide" | "practice" | "cheatsheet" | "quiz";
 
 export type GenerateRequest = {

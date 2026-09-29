@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
 import { ErrorBox, PageLoading, ScorePill, Spinner } from "@/components/ui";
+import { APP_NAME } from "@/lib/brand";
 import { api, dayKeyOf, fmtDay, fmtTime, setPending } from "@/lib/client";
-import type { CourseView, DashItem, Material, Mode, ModuleEntry, ModuleView, Status } from "@/lib/types";
+import type { CourseView, DashItem, Material, MaterialPreview, Mode, ModuleEntry, ModuleView, Status } from "@/lib/types";
 
 const MODES: { id: Mode; label: string; desc: string; cta: string }[] = [
   { id: "guide", label: "Study guide", desc: "Explanations, worked examples, practice", cta: "Write my study guide" },
@@ -15,6 +16,7 @@ const MODES: { id: Mode; label: string; desc: string; cta: string }[] = [
 ];
 
 type Toggle = (keys: string[], on: boolean) => void;
+type Preview = (m: Material) => void;
 
 export default function CoursePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -41,6 +43,7 @@ function CourseScreen({ courseId }: { courseId: number }) {
   const [suggesting, setSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<{ text: string; ok: boolean } | null>(null);
   const autoRan = useRef(false);
+  const [previewing, setPreviewing] = useState<Material | null>(null);
 
   const load = useCallback(
     async (refresh = false) => {
@@ -172,7 +175,7 @@ function CourseScreen({ courseId }: { courseId: number }) {
               )}
             </p>
           </div>
-          <Materials data={data} selected={selected} toggle={toggle} />
+          <Materials data={data} selected={selected} toggle={toggle} preview={setPreviewing} />
         </div>
 
         <aside className="order-1 space-y-4 lg:sticky lg:top-20 lg:order-2 lg:self-start">
@@ -258,23 +261,24 @@ function CourseScreen({ courseId }: { courseId: number }) {
           {data.upcoming.length > 0 && <Upcoming items={data.upcoming} />}
         </aside>
       </div>
+      {previewing && <PreviewModal courseId={courseId} material={previewing} onClose={() => setPreviewing(null)} />}
     </div>
   );
 }
 
-function Materials({ data, selected, toggle }: { data: CourseView; selected: Set<string>; toggle: Toggle }) {
+function Materials({ data, selected, toggle, preview }: { data: CourseView; selected: Set<string>; toggle: Toggle; preview: Preview }) {
   const empty = data.modules.every((m) => m.entries.length === 0) && !data.otherFiles.length && !data.otherPages.length;
   if (empty) return <div className="card p-6 text-sm muted">This course doesn&apos;t have any modules or files on Canvas yet.</div>;
   return (
     <div className="space-y-3">
       {data.modules.map((m) => (
-        <ModuleCard key={m.id} mod={m} selected={selected} toggle={toggle} />
+        <ModuleCard key={m.id} mod={m} selected={selected} toggle={toggle} preview={preview} />
       ))}
       {data.otherFiles.length > 0 && (
-        <ExtraCard title="Other course files" note="Files that aren't linked from a module" items={data.otherFiles} selected={selected} toggle={toggle} />
+        <ExtraCard title="Other course files" note="Files that aren't linked from a module" items={data.otherFiles} selected={selected} toggle={toggle} preview={preview} />
       )}
       {data.otherPages.length > 0 && (
-        <ExtraCard title="Other course pages" note="Pages that aren't linked from a module" items={data.otherPages} selected={selected} toggle={toggle} />
+        <ExtraCard title="Other course pages" note="Pages that aren't linked from a module" items={data.otherPages} selected={selected} toggle={toggle} preview={preview} />
       )}
     </div>
   );
@@ -302,7 +306,7 @@ function SelectAll({ keys, selected, toggle }: { keys: string[]; selected: Set<s
   );
 }
 
-function ModuleCard({ mod, selected, toggle }: { mod: ModuleView; selected: Set<string>; toggle: Toggle }) {
+function ModuleCard({ mod, selected, toggle, preview }: { mod: ModuleView; selected: Set<string>; toggle: Toggle; preview: Preview }) {
   const keys = mod.entries.flatMap((e) => (e.type === "material" && e.material.supported ? [e.material.key] : []));
   return (
     <details open className="card overflow-hidden">
@@ -313,14 +317,28 @@ function ModuleCard({ mod, selected, toggle }: { mod: ModuleView; selected: Set<
       <ul className="border-t border-stone-100 pb-2 dark:border-stone-800">
         {mod.entries.length === 0 && <li className="px-4 py-3 text-sm muted">Nothing posted yet.</li>}
         {mod.entries.map((e, i) => (
-          <EntryRow key={i} entry={e} selected={selected} toggle={toggle} />
+          <EntryRow key={i} entry={e} selected={selected} toggle={toggle} preview={preview} />
         ))}
       </ul>
     </details>
   );
 }
 
-function ExtraCard({ title, note, items, selected, toggle }: { title: string; note: string; items: Material[]; selected: Set<string>; toggle: Toggle }) {
+function ExtraCard({
+  title,
+  note,
+  items,
+  selected,
+  toggle,
+  preview,
+}: {
+  title: string;
+  note: string;
+  items: Material[];
+  selected: Set<string>;
+  toggle: Toggle;
+  preview: Preview;
+}) {
   const keys = items.filter((m) => m.supported).map((m) => m.key);
   return (
     <details className="card overflow-hidden">
@@ -332,14 +350,14 @@ function ExtraCard({ title, note, items, selected, toggle }: { title: string; no
       </summary>
       <ul className="border-t border-stone-100 pb-2 dark:border-stone-800">
         {items.map((m) => (
-          <MaterialRow key={m.key} m={m} selected={selected} toggle={toggle} />
+          <MaterialRow key={m.key} m={m} selected={selected} toggle={toggle} preview={preview} />
         ))}
       </ul>
     </details>
   );
 }
 
-function EntryRow({ entry: e, selected, toggle }: { entry: ModuleEntry; selected: Set<string>; toggle: Toggle }) {
+function EntryRow({ entry: e, selected, toggle, preview }: { entry: ModuleEntry; selected: Set<string>; toggle: Toggle; preview: Preview }) {
   if (e.type === "header") return <li className="px-4 pt-3 pb-1 text-xs font-semibold tracking-wide uppercase muted">{e.title}</li>;
   if (e.type === "link") {
     return (
@@ -356,7 +374,7 @@ function EntryRow({ entry: e, selected, toggle }: { entry: ModuleEntry; selected
       </li>
     );
   }
-  return <MaterialRow m={e.material} selected={selected} toggle={toggle} />;
+  return <MaterialRow m={e.material} selected={selected} toggle={toggle} preview={preview} />;
 }
 
 const KIND_TAG: Record<string, [string, string]> = {
@@ -372,7 +390,7 @@ const KIND_TAG: Record<string, [string, string]> = {
 
 const fmtSize = (b: number) => (b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
 
-function MaterialRow({ m, selected, toggle }: { m: Material; selected: Set<string>; toggle: Toggle }) {
+function MaterialRow({ m, selected, toggle, preview }: { m: Material; selected: Set<string>; toggle: Toggle; preview: Preview }) {
   const tag = KIND_TAG[m.kind === "page" ? "page" : (m.fileKind ?? "unsupported")] ?? KIND_TAG.unsupported;
   const on = selected.has(m.key);
   return (
@@ -395,6 +413,19 @@ function MaterialRow({ m, selected, toggle }: { m: Material; selected: Set<strin
           {!m.supported && m.reason && <span className="block text-xs muted">{m.reason}</span>}
         </span>
         {m.size ? <span className="hidden text-xs tabular-nums muted sm:inline">{fmtSize(m.size)}</span> : null}
+        {m.supported && (
+          <button
+            type="button"
+            onClick={(ev) => {
+              ev.preventDefault();
+              preview(m);
+            }}
+            className="shrink-0 text-xs muted hover:underline"
+            title="See the text the app reads from this (free)"
+          >
+            preview
+          </button>
+        )}
         {m.url && (
           <a href={m.url} target="_blank" rel="noreferrer" className="shrink-0 text-xs muted hover:underline">
             open ↗
@@ -422,6 +453,63 @@ function Upcoming({ items }: { items: DashItem[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function PreviewModal({ courseId, material, onClose }: { courseId: number; material: Material; onClose: () => void }) {
+  const [data, setData] = useState<MaterialPreview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<MaterialPreview>(`/api/course/${courseId}/material?key=${encodeURIComponent(material.key)}`)
+      .then(setData)
+      .catch((e) => setError((e as Error).message));
+  }, [courseId, material.key]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const stats = data
+    ? [
+        data.units && data.unitLabel && data.unitLabel !== "section" ? `${data.units} ${data.unitLabel}s` : null,
+        `${data.chars.toLocaleString()} characters`,
+        `~${Math.max(1, Math.round(data.approxTokens / 1000))}k tokens`,
+        data.cached ? "cached" : "just downloaded",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="card flex max-h-[85vh] w-full max-w-3xl flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-stone-200 p-4 dark:border-stone-800">
+          <div className="min-w-0">
+            <p className="text-xs muted">What {APP_NAME} reads from</p>
+            <h2 className="truncate font-semibold">{material.title}</h2>
+            {stats && <p className="mt-0.5 text-xs muted">{stats}</p>}
+          </div>
+          <button className="btn btn-sm shrink-0" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div className="overflow-y-auto p-4">
+          {!data && !error && <PageLoading label="Downloading and reading the file…" />}
+          {error && <ErrorBox message={error} />}
+          {data?.lowText && (
+            <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              Very little text came out of this file. It may be mostly images, diagrams or math. Turn on “Read PDFs visually” to
+              capture more.
+            </p>
+          )}
+          {data && <pre className="font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">{data.text || "(no text found)"}</pre>}
+          {data?.truncated && <p className="mt-3 text-xs muted">Showing the first 80,000 characters.</p>}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { forget } from "@/lib/cache";
-import { checkCanvas } from "@/lib/canvas";
+import { CanvasError, checkCanvas } from "@/lib/canvas";
 import { normalizeBaseUrl, readConfig, updateConfig } from "@/lib/config";
 import { errorMessage, guard } from "@/lib/http";
 import { availableModels, checkApiKey, forgetModels } from "@/lib/models";
@@ -55,6 +55,8 @@ export async function POST(req: Request) {
       }
     } catch (e) {
       errors.canvas = errorMessage(e);
+      // Log why (never the token itself) so failed connections can be debugged.
+      console.warn(`Canvas connect failed${e instanceof CanvasError ? ` (HTTP ${e.status})` : ""}: ${errors.canvas}`);
     }
   }
 
@@ -67,6 +69,7 @@ export async function POST(req: Request) {
       aiOk = true;
     } catch (e) {
       errors.ai = errorMessage(e);
+      console.warn(`API key check failed: ${errors.ai}`);
     }
   }
 

@@ -1,8 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { canvas, canvasWebUrl, downloadFile, type CanvasFile, type CanvasModuleItem, type CanvasPage } from "./canvas";
+import { canvas, CanvasError, canvasWebUrl, downloadFile, type CanvasFile, type CanvasModuleItem, type CanvasPage } from "./canvas";
 import { getCached, putCached, remember } from "./cache";
 import { extractFile, fileKind, htmlToMarkdown, KIND_REASON, pdfPageCount } from "./extract";
-import type { Material, ModuleEntry, ModuleView, UsedSource } from "./types";
+import type { Material, MaterialPreview, ModuleEntry, ModuleView, UsedSource } from "./types";
 
 export type CourseMaterials = {
   modules: ModuleView[];
@@ -164,6 +164,29 @@ async function loadMaterial(courseId: number, m: Material, visual: boolean): Pro
   const ex = await extractFile(kind, buf, name);
   putCached({ key: cacheKey, version, title: name, text: ex.text, units: ex.units, unitLabel: ex.unitLabel });
   return { kind: "text", title: name, text: ex.text, units: ex.units, unitLabel: ex.unitLabel, cached: false, isPdf: kind === "pdf" };
+}
+
+const PREVIEW_CHARS = 80_000;
+
+/** Read one material as text, exactly as a study guide would see it. No AI involved. */
+export async function previewMaterial(courseId: number, key: string): Promise<MaterialPreview> {
+  const m = (await getCourseMaterials(courseId)).all[key];
+  if (!m) throw new CanvasError(404, "That material isn't in this course anymore. Refresh the page.");
+  if (!m.supported) throw new Error(m.reason ?? "This file type isn't supported yet.");
+  const r = await loadMaterial(courseId, m, false);
+  if (r.kind !== "text") throw new Error("Couldn't read this material as text.");
+  const text = r.text.trim();
+  return {
+    title: r.title,
+    text: text.slice(0, PREVIEW_CHARS),
+    truncated: text.length > PREVIEW_CHARS,
+    chars: text.length,
+    approxTokens: approxTokens(text.length),
+    units: r.units,
+    unitLabel: r.unitLabel,
+    cached: r.cached,
+    lowText: r.isPdf && !!r.units && text.length / r.units < 120,
+  };
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
