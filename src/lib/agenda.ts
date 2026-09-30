@@ -4,6 +4,7 @@ import { readConfig } from "./config";
 import { courseColor, courseLabel, courseScore, splitCourses } from "./courses";
 import { htmlToMarkdown } from "./extract";
 import { modulesOf } from "./materials";
+import { loadPersonal, personalDashItems, personalPlanBlock } from "./personal";
 import { eventMentions, stripDates } from "./text";
 import type { DashCourse, DashItem, Dashboard, ItemStatus } from "./types";
 
@@ -174,6 +175,7 @@ export async function getDashboard(force = false): Promise<Dashboard> {
     missing.push(...r.missing);
     lowScores.push(...r.lowScores);
   }
+  timeline.push(...personalDashItems(loadPersonal(), now));
   timeline.sort((a, b) => sortKey(a) - sortKey(b));
   missing.sort((a, b) => sortKey(b) - sortKey(a));
   const hidden = snap.hidden.map((c) => {
@@ -210,6 +212,8 @@ const STATUS_TEXT: Record<ItemStatus, string> = {
   upcoming: "not submitted yet",
   excused: "excused",
   note: "exam/quiz",
+  busy: "busy",
+  task: "to-do",
 };
 
 export function describeItem(i: DashItem): string {
@@ -258,5 +262,7 @@ export async function planContext(): Promise<string> {
     lines.push("</course>");
     blocks.push(lines.join("\n"));
   }
+  const personal = personalPlanBlock(loadPersonal(), now);
+  if (personal) blocks.push(personal);
   return blocks.join("\n\n");
 }

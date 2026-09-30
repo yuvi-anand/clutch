@@ -11,6 +11,28 @@ export type StreamEvent =
 
 export type ModelOption = { id: string; label: string; note: string };
 
+/** Something outside class the plan should work around: busy time, or a non-class to-do. */
+export type PersonalItem = {
+  id: string;
+  kind: "busy" | "task";
+  title: string;
+  /** YYYY-MM-DD. Busy: first day. Task: when they plan to start (optional). */
+  start?: string;
+  /** YYYY-MM-DD. Busy: last day (inclusive). Task: due date. */
+  end?: string;
+  /** Busy only: no study time at all, or some. */
+  availability?: "none" | "limited";
+  /** Task: estimated hours. Busy + limited: study hours still available per day. */
+  hours?: number;
+  notes?: string;
+  done?: boolean;
+  /** What the student typed. */
+  source: string;
+  createdAt: string;
+};
+
+export type PersonalState = { items: PersonalItem[]; notes: string; updatedAt?: string };
+
 export type Status = {
   canvasConnected: boolean;
   canvasBaseUrl: string | null;
@@ -23,7 +45,7 @@ export type Status = {
   aiFromEnv: boolean;
 };
 
-export type ItemStatus = "missing" | "submitted" | "graded" | "upcoming" | "excused" | "note";
+export type ItemStatus = "missing" | "submitted" | "graded" | "upcoming" | "excused" | "note" | "busy" | "task";
 
 export type DashItem = {
   id: string;
@@ -39,7 +61,7 @@ export type DashItem = {
   status: ItemStatus;
   /** Submitted somewhere other than Canvas (Gradescope, Pawtograder, on paper...). */
   external?: boolean;
-  source: "canvas" | "syllabus" | "module";
+  source: "canvas" | "syllabus" | "module" | "personal" | "website";
   detail?: string;
   isAssessment?: boolean;
 };

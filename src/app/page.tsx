@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineFeedback } from "@/components/Feedback";
+import { YourWeek } from "@/components/YourWeek";
 import { Markdown } from "@/components/Markdown";
 import { ErrorBox, PageLoading, ScorePill, Spinner, useStreamText } from "@/components/ui";
 import { APP_NAME } from "@/lib/brand";
@@ -14,6 +15,7 @@ export default function DashboardPage() {
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [personalAt, setPersonalAt] = useState<string | undefined>(undefined);
 
   const load = useCallback(async (refresh = false) => {
     setError(null);
@@ -79,7 +81,14 @@ export default function DashboardPage() {
       </section>
       <HiddenCourses hidden={dash.hidden} onShow={(id) => setVisible(id, true)} />
 
-      <PlanCard aiConfigured={status.aiConfigured} />
+      <YourWeek
+        onChange={(s) => {
+          setPersonalAt(s.updatedAt);
+          load(false);
+        }}
+      />
+
+      <PlanCard aiConfigured={status.aiConfigured} personalAt={personalAt} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Timeline items={dash.timeline} courses={courseById} />
@@ -178,7 +187,7 @@ function HiddenCourses({ hidden, onShow }: { hidden: DashCourse[]; onShow: (id: 
   );
 }
 
-function PlanCard({ aiConfigured }: { aiConfigured: boolean }) {
+function PlanCard({ aiConfigured, personalAt }: { aiConfigured: boolean; personalAt?: string }) {
   const [plan, setPlan] = useState<SavedPlan | null>(null);
   const [running, setRunning] = useState(false);
   const [statusText, setStatusText] = useState("");
@@ -240,6 +249,11 @@ function PlanCard({ aiConfigured }: { aiConfigured: boolean }) {
           )}
         </button>
       </div>
+      {plan && !running && personalAt && personalAt > plan.createdAt && (
+        <p className="border-t border-stone-200 px-5 py-3 text-sm text-amber-800 dark:border-stone-800 dark:text-amber-300">
+          Your week changed since this plan was built. Rebuild it to work around the new items.
+        </p>
+      )}
       {!aiConfigured && (
         <p className="border-t border-stone-200 px-5 py-4 text-sm muted dark:border-stone-800">
           Add your Anthropic API key on the{" "}
@@ -308,6 +322,8 @@ const BADGES: Record<ItemStatus, [string, string] | null> = {
   graded: ["Graded", "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200"],
   excused: ["Excused", ""],
   note: ["Exam / quiz", "bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200"],
+  busy: ["Busy", "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200"],
+  task: ["To-do", "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200"],
   upcoming: null,
 };
 
@@ -320,9 +336,10 @@ function StatusBadge({ item }: { item: DashItem }) {
 }
 
 function TimelineRow({ item: i, course }: { item: DashItem; course?: DashCourse }) {
+  const personal = i.source === "personal";
   const meta = [
-    course?.code,
-    i.dueAt ? fmtTime(i.dueAt) : "all day",
+    personal ? "Your week" : course?.code,
+    personal ? i.detail : i.dueAt ? fmtTime(i.dueAt) : "all day",
     i.points ? `${i.points} pts` : null,
     i.source === "syllabus" ? "from the syllabus" : i.source === "module" ? "from the modules page" : null,
     i.external && i.status === "upcoming" ? "turned in outside Canvas" : null,
@@ -331,7 +348,10 @@ function TimelineRow({ item: i, course }: { item: DashItem; course?: DashCourse 
     .join(" · ");
   return (
     <li className="flex items-start gap-3 py-2.5">
-      <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: course?.color ?? "#a8a29e" }} />
+      <span
+        className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+        style={{ background: personal ? (i.status === "busy" ? "#94a3b8" : "#38bdf8") : (course?.color ?? "#a8a29e") }}
+      />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {i.url ? (
@@ -343,7 +363,7 @@ function TimelineRow({ item: i, course }: { item: DashItem; course?: DashCourse 
           )}
           <StatusBadge item={i} />
         </div>
-        <p className="mt-0.5 text-xs muted" title={i.detail}>
+        <p className="mt-0.5 text-xs muted" title={personal ? undefined : i.detail}>
           {meta}
         </p>
       </div>

@@ -143,6 +143,8 @@ A ranked list. For each: what to do, why now (deadline or weight), and a rough t
 ## Day by day
 From today through ${end}. Give each day a heading like "### Tue Sep 29" and 1–4 tasks with time estimates. Put study sessions before quizzes and exams, keep days realistic, and leave some slack. You don't know their class schedule, so don't schedule lectures.
 
+If there's a <personal> section, plan around it. Don't schedule studying during busy times when the student can't study, and on limited days stay within the time they have. When a busy stretch is coming, move work earlier. Fit their other tasks into the day-by-day plan before those are due, and count them in each day's load like any class task.
+
 ## What to study
 For each course, the specific topics to review, taken from the module names and items. Write each topic as a link that opens the study tool, in exactly this format: [Topic name](/course/COURSE_ID?topics=Topic%20name), using the course id from the snapshot and URL-encoding the topic.
 
@@ -168,3 +170,18 @@ export const SuggestSchema = z.object({
   topics: z.string(),
   reason: z.string(),
 });
+
+export const PERSONAL_SYSTEM =
+  "You turn a student's plain-English note about their schedule into structured items for a study planner. Answer only with the requested JSON.";
+
+export function personalPrompt(text: string, today: string): string {
+  return `Today is ${today}. The student wrote:
+"${text}"
+
+Make one item for each thing they mention.
+- kind "busy": time they can't study or will have less time than usual (events, tournaments, trips, work shifts, appointments). start and end are dates (YYYY-MM-DD), inclusive; a one-day event has start equal to end. availability is "none" if they can't study at all then, or "limited" if they'll still have some time. hours is the study time per day they'll still have, or 0 if unknown.
+- kind "task": something they need to get done that isn't class work (internship or job applications, club work, interview prep, errands). end is the due date (YYYY-MM-DD), or "" if there isn't one. start is "" unless they say when they'll start. hours is the estimated time, or 0 if unknown. availability is "n/a".
+- One sentence can hold both, e.g. "interview Sunday at 2, need 2 hours to prep" is a busy item for the interview (limited) and a task for the prep, due Sunday.
+
+Resolve relative dates from today: "Saturday" is the next Saturday on or after today, "this weekend" is the coming Saturday and Sunday, and "next weekend" is the weekend after that. Keep titles short (2 to 6 words) and put other details in notes. Don't invent items or dates the student didn't mention.`;
+}

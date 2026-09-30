@@ -38,3 +38,22 @@ export function stripDates(raw: string): string {
     .trim();
   return t || raw.trim();
 }
+
+/** Local-time YYYY-MM-DD. */
+export function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** "2026-10-03" -> "Sat, Oct 3" */
+export function fmtDateKey(key: string, withWeekday = true): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", withWeekday ? { weekday: "short", month: "short", day: "numeric" } : { month: "short", day: "numeric" });
+}
+
+/** "Sat, Oct 3" or "Oct 10–12" or "Oct 30 – Nov 2" */
+export function fmtRange(start: string, end: string): string {
+  if (start === end) return fmtDateKey(start);
+  const [, m1] = start.split("-");
+  const [, m2, d2] = end.split("-");
+  return m1 === m2 ? `${fmtDateKey(start, false)}–${Number(d2)}` : `${fmtDateKey(start, false)} – ${fmtDateKey(end, false)}`;
+}

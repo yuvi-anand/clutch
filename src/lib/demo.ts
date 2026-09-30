@@ -1,4 +1,4 @@
-import type { DashItem, Dashboard, SavedPlan, Status } from "./types";
+import type { DashItem, Dashboard, PersonalState, SavedPlan, Status } from "./types";
 
 // Demo mode (DEMO_MODE=1) shows the dashboard with made-up sample data, so
 // people can try the app, and screenshots can be taken, without a Canvas
@@ -25,6 +25,13 @@ function at(days: number, hour: number, minute = 59): string {
 function dateKey(days: number): string {
   const d = new Date(Date.now() + days * DAY);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Sort key: exact due time, or local midnight for all-day items. */
+function when(i: DashItem): number {
+  if (i.dueAt) return Date.parse(i.dueAt);
+  const [y, m, d] = (i.dateOnly ?? "").split("-").map(Number);
+  return new Date(y, m - 1, d).getTime();
 }
 
 type Base = Pick<DashItem, "id" | "courseId" | "title" | "status">;
@@ -65,7 +72,10 @@ export function demoDashboard(): Dashboard {
       item({ id: "d6", courseId: 101, title: "Midterm 2", status: "note", dateOnly: dateKey(9), source: "syllabus", isAssessment: true }),
       item({ id: "d7", courseId: 102, title: "Lab Report 4: Photosynthesis", status: "upcoming", dueAt: at(12, 21), points: 25 }),
       item({ id: "d8", courseId: 103, title: "Midterm Exam", status: "note", dateOnly: dateKey(16), source: "syllabus", isAssessment: true }),
-    ],
+      item({ id: "p-p1", courseId: 0, title: "Soccer tournament", status: "busy", dateOnly: dateKey(3), source: "personal", detail: "can't study" }),
+      item({ id: "p-p2", courseId: 0, title: "Interview prep", status: "task", dateOnly: dateKey(5), source: "personal", detail: "about 2 h" }),
+      item({ id: "p-p3", courseId: 0, title: "Summer internship applications", status: "task", dateOnly: dateKey(15), source: "personal", detail: "about 4 h" }),
+    ].sort((x, y) => when(x) - when(y)),
     missing: [item({ id: "m1", courseId: 103, title: "Reading Quiz 2", status: "missing", dueAt: at(-6, 23), points: 10 })],
     lowScores: [
       item({ id: "l1", courseId: 101, title: "Quiz 3: Sequences and Series", status: "graded", score: 5, points: 10, dueAt: at(-8, 11), isAssessment: true }),
@@ -103,5 +113,17 @@ export function demoPlan(): SavedPlan {
     model: "demo",
     cost: 0.11,
     createdAt: new Date(Date.now() - 2 * 60e3).toISOString(),
+  };
+}
+
+export function demoPersonal(): PersonalState {
+  const created = new Date(Date.now() - 3600e3).toISOString();
+  return {
+    notes: "I focus best in the mornings. Weekdays I have about 3 hours.",
+    items: [
+      { id: "p1", kind: "busy", title: "Soccer tournament", start: dateKey(3), end: dateKey(3), availability: "none", source: "soccer tournament all day Saturday", createdAt: created },
+      { id: "p2", kind: "task", title: "Interview prep", end: dateKey(5), hours: 2, source: "prep 2 hours for my interview", createdAt: created },
+      { id: "p3", kind: "task", title: "Summer internship applications", end: dateKey(15), hours: 4, source: "apply to 5 internships", createdAt: created },
+    ],
   };
 }
