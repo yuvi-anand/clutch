@@ -3,6 +3,8 @@ import { peek, remember } from "./cache";
 import { readConfig } from "./config";
 import { courseColor, courseLabel, courseScore, splitCourses } from "./courses";
 import { htmlToMarkdown } from "./extract";
+import { eventDashItems, eventKey, upcomingLectures } from "./events";
+import { extraEvents, getExtras, manualCourse, manualCourses } from "./extras";
 import { modulesOf } from "./materials";
 import { loadPersonal, personalDashItems, personalPlanBlock } from "./personal";
 import { eventMentions, stripDates } from "./text";
@@ -147,7 +149,17 @@ function courseItems(cd: CourseData, now: Date) {
     i.dueAt
       ? Date.parse(i.dueAt) >= t - 12 * 3600e3 && Date.parse(i.dueAt) <= t + days * DAY
       : Boolean(i.dateOnly && i.dateOnly >= todayKey && i.dateOnly <= localDateKey(new Date(t + days * DAY)));
-  const timeline = [...items.filter((i) => i.status !== "excused" && inWindow(i, 21)), ...notes.filter((n) => inWindow(n, 21))];
+  const known = new Set([...items, ...notes].map((i) => eventKey(i.title)).filter(Boolean));
+  const noteDays = new Set(notes.map((n) => `${n.dateOnly}|${n.title.toLowerCase()}`));
+  const extra = eventDashItems(cd.course.id, extraEvents(getExtras(cd.course.id)), now).filter((e) => {
+    const k = eventKey(e.title);
+    return !(k && known.has(k)) && !noteDays.has(`${e.dateOnly}|${e.title.toLowerCase()}`);
+  });
+  const timeline = [
+    ...items.filter((i) => i.status !== "excused" && inWindow(i, 21)),
+    ...notes.filter((n) => inWindow(n, 21)),
+    ...extra.filter((e) => inWindow(e, 21)),
+  ];
   const missing = items.filter((i) => i.status === "missing");
   const lowScores = items.filter(
     (i) =>
@@ -175,6 +187,12 @@ export async function getDashboard(force = false): Promise<Dashboard> {
     missing.push(...r.missing);
     lowScores.push(...r.lowScores);
   }
+  for (const mc of manualCourses()) {
+    const items = eventDashItems(mc.id, extraEvents(getExtras(mc.id)), now);
+    const week = eventDashItems(mc.id, extraEvents(getExtras(mc.id)), now, 7).length;
+    courses.push({ id: mc.id, name: mc.name, code: mc.code, color: mc.color, score: null, upcoming: week, missing: 0, manual: true });
+    timeline.push(...items);
+  }
   timeline.push(...personalDashItems(loadPersonal(), now));
   timeline.sort((a, b) => sortKey(a) - sortKey(b));
   missing.sort((a, b) => sortKey(b) - sortKey(a));
@@ -187,6 +205,7 @@ export async function getDashboard(force = false): Promise<Dashboard> {
 
 /** Upcoming items for one course (uses the dashboard snapshot when it's fresh). */
 export async function courseUpcoming(courseId: number, force = false): Promise<DashItem[]> {
+  if (courseId < 0) return eventDashItems(courseId, extraEvents(getExtras(courseId)), new Date()).sort((a, b) => sortKey(a) - sortKey(b));
   let cd = force ? undefined : peek<Snapshot>("snapshot", TTL)?.visible.find((c) => c.course.id === courseId);
   if (!cd) {
     const [course, assignments, modules] = await Promise.all([
@@ -203,7 +222,7 @@ const fmtWhen = (i: DashItem) =>
   i.dueAt
     ? new Date(i.dueAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
     : new Date(sortKey(i)).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) +
-      ` (date found in the ${i.source === "syllabus" ? "syllabus" : "module headings"})`;
+      ` (date from the ${i.source === "syllabus" ? "syllabus" : i.source === "module" ? "module headings" : i.source === "notes" ? "student's notes" : "course website"})`;
 
 const STATUS_TEXT: Record<ItemStatus, string> = {
   missing: "MISSING",
@@ -259,10 +278,33 @@ export async function planContext(): Promise<string> {
     }
     const ex = syllabusExcerpt(cd.syllabus);
     if (ex) lines.push("Syllabus excerpts (grading, exams, late work):", ex);
+    const lectures = upcomingLectures(extraEvents(getExtras(cd.course.id)), now);
+    if (lectures.length) lines.push("Other class sessions in the next 2 weeks (from the course website: lectures, recitations, reviews, no-class days):", ...lectures.map((l) => `- ${l}`));
+    lines.push("</course>");
+    blocks.push(lines.join("\n"));
+  }
+  for (const mc of manualCourses()) {
+    const ex = getExtras(mc.id);
+    const events = extraEvents(ex);
+    const upcoming = eventDashItems(mc.id, events, now).sort((a, b) => sortKey(a) - sortKey(b));
+    const lectures = upcomingLectures(events, now);
+    const lines = [
+      `<course id="${mc.id}" code="${mc.code}" name="${mc.name}" current_score="not on Canvas (the student added this class)">`,
+      "Coming up in the next 3 weeks:",
+      ...(upcoming.length ? upcoming.map(describeItem) : ["- no dates found yet"]),
+    ];
+    if (lectures.length) lines.push("Other class sessions in the next 2 weeks:", ...lectures.map((l) => `- ${l}`));
+    if (ex.notes.trim()) lines.push("Syllabus or notes the student pasted in (excerpt):", ex.notes.trim().slice(0, 3000));
     lines.push("</course>");
     blocks.push(lines.join("\n"));
   }
   const personal = personalPlanBlock(loadPersonal(), now);
   if (personal) blocks.push(personal);
   return blocks.join("\n\n");
+}
+
+/** A class's display name, for Canvas classes and ones the student added. */
+export async function courseDisplayName(courseId: number): Promise<string> {
+  if (courseId < 0) return manualCourse(courseId)?.name ?? "Your class";
+  return courseLabel(await canvas.course(courseId)).name;
 }

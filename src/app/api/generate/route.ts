@@ -2,11 +2,9 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { demoBlocked } from "@/lib/demo";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
-import { courseUpcoming, describeItem } from "@/lib/agenda";
+import { courseDisplayName, courseUpcoming, describeItem } from "@/lib/agenda";
 import { runModel } from "@/lib/ai";
-import { canvas } from "@/lib/canvas";
 import { readConfig } from "@/lib/config";
-import { courseLabel } from "@/lib/courses";
 import { guard, ndjson } from "@/lib/http";
 import { gatherSources, getCourseMaterials } from "@/lib/materials";
 import { QuizSchema, TUTOR_SYSTEM, modeInstructions } from "@/lib/prompts";
@@ -49,8 +47,7 @@ export async function POST(req: Request) {
   if (b.visual && readConfig().aiCommand) b.visual = false;
   return ndjson(req, async (send, signal) => {
     send({ t: "status", text: "Loading the course from Canvas…" });
-    const [mats, course] = await Promise.all([getCourseMaterials(b.courseId), canvas.course(b.courseId)]);
-    const courseName = courseLabel(course).name;
+    const [mats, courseName] = await Promise.all([getCourseMaterials(b.courseId), courseDisplayName(b.courseId)]);
     // Course order (not click order) keeps the prompt prefix stable for caching.
     const picked = Object.values(mats.all).filter((m) => b.keys.includes(m.key) && m.supported);
     if (!picked.length) throw new Error("None of the selected materials could be found. Refresh the course page and try again.");

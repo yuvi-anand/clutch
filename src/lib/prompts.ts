@@ -185,3 +185,20 @@ Make one item for each thing they mention.
 
 Resolve relative dates from today: "Saturday" is the next Saturday on or after today, "this weekend" is the coming Saturday and Sunday, and "next weekend" is the weekend after that. Keep titles short (2 to 6 words) and put other details in notes. Don't invent items or dates the student didn't mention.`;
 }
+
+export const EVENTS_SYSTEM =
+  "You pull dated course events out of course web pages, syllabi and schedules for a student's planner. Answer only with the requested JSON.";
+
+export function eventsPrompt(course: string, today: string, yearNote: string, body: string): string {
+  return `Course: ${course}. Today is ${today}. ${yearNote}
+
+${body}
+
+List every dated item a student needs to plan for:
+- exams and quizzes: midterms, finals, quizzes (kind "exam" or "quiz")
+- homework: homework, problem sets, assignments and essays, on the date they're due (kind "homework")
+- projects and labs: deadlines or sessions (kind "project" or "lab")
+- lectures: the topic of each dated class meeting (kind "lecture"), with the topic as the title, like "Dynamic programming"
+
+Use date YYYY-MM-DD, and time "HH:MM" (24-hour) only when a time is given, otherwise "". Keep titles short, like "Homework 2" or "Midterm 1". Put rooms, what an exam covers, or "tentative" in notes, otherwise "". Skip items without a specific date (like "final exam: TBD"), and never guess a date.`;
+}

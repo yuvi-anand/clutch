@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineFeedback } from "@/components/Feedback";
 import { YourWeek } from "@/components/YourWeek";
@@ -79,7 +80,10 @@ export default function DashboardPage() {
           <CourseCard key={c.id} course={c} onHide={() => setVisible(c.id, false)} />
         ))}
       </section>
-      <HiddenCourses hidden={dash.hidden} onShow={(id) => setVisible(id, true)} />
+      <div className="-mt-4 flex flex-wrap items-start gap-x-8 gap-y-3">
+        <AddClass />
+        <HiddenCourses hidden={dash.hidden} onShow={(id) => setVisible(id, true)} />
+      </div>
 
       <YourWeek
         onChange={(s) => {
@@ -142,7 +146,7 @@ function CourseCard({ course: c, onHide }: { course: DashCourse; onHide: () => v
           <p className="text-xs font-semibold tracking-wide uppercase muted">{c.code}</p>
           <h3 className="mt-0.5 leading-snug font-semibold">{shortName(c)}</h3>
         </div>
-        <ScorePill score={c.score} />
+        {c.manual ? <span className="chip">Not on Canvas</span> : <ScorePill score={c.score} />}
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <span className="chip">{c.upcoming === 0 ? "Nothing due this week" : `${c.upcoming} due this week`}</span>
@@ -152,13 +156,13 @@ function CourseCard({ course: c, onHide }: { course: DashCourse; onHide: () => v
         <Link href={`/course/${c.id}`} className="link text-sm">
           Study for this class →
         </Link>
-        <button
+        {!c.manual && <button
           onClick={onHide}
           title="Not a real class? Hide it from the dashboard."
           className="text-xs opacity-0 transition-opacity muted group-hover:opacity-100 hover:underline focus:opacity-100"
         >
           Hide
-        </button>
+        </button>}
       </div>
     </div>
   );
@@ -168,7 +172,7 @@ function HiddenCourses({ hidden, onShow }: { hidden: DashCourse[]; onShow: (id: 
   const [open, setOpen] = useState(false);
   if (!hidden.length) return null;
   return (
-    <div className="-mt-4 text-sm muted">
+    <div className="text-sm muted">
       <button className="hover:underline" onClick={() => setOpen(!open)}>
         {open ? "Hide the list of" : "Show"} {hidden.length} other Canvas course{hidden.length === 1 ? "" : "s"} (past semesters, orientation…)
       </button>
@@ -341,7 +345,15 @@ function TimelineRow({ item: i, course }: { item: DashItem; course?: DashCourse 
     personal ? "Your week" : course?.code,
     personal ? i.detail : i.dueAt ? fmtTime(i.dueAt) : "all day",
     i.points ? `${i.points} pts` : null,
-    i.source === "syllabus" ? "from the syllabus" : i.source === "module" ? "from the modules page" : null,
+    i.source === "syllabus"
+      ? "from the syllabus"
+      : i.source === "module"
+        ? "from the modules page"
+        : i.source === "website"
+          ? "from the course website"
+          : i.source === "notes"
+            ? "from your notes"
+            : null,
     i.external && i.status === "upcoming" ? "turned in outside Canvas" : null,
   ]
     .filter(Boolean)
@@ -422,5 +434,54 @@ function Attention({ missing, lowScores, courses }: { missing: DashItem[]; lowSc
       )}
       <p className="mt-6 text-xs muted">Canvas can&apos;t see work you turn in on Gradescope, Pawtograder or other sites, so double-check those.</p>
     </section>
+  );
+}
+
+function AddClass() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!open) {
+    return (
+      <button className="text-sm muted hover:underline" onClick={() => setOpen(true)}>
+        + Add a class that isn&apos;t on Canvas
+      </button>
+    );
+  }
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        setSaving(true);
+        setError(null);
+        try {
+          const c = await api<{ id: number }>("/api/courses/manual", { action: "create", name });
+          router.push(`/course/${c.id}`);
+        } catch (err) {
+          setError((err as Error).message);
+          setSaving(false);
+        }
+      }}
+    >
+      <input
+        id="add-class-name"
+        autoFocus
+        className="input w-72"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="e.g. DS 3000 Foundations of Data Science"
+      />
+      <button className="btn btn-sm" disabled={saving || !name.trim()}>
+        {saving ? "Adding…" : "Add class"}
+      </button>
+      <button type="button" className="text-xs muted hover:underline" onClick={() => setOpen(false)}>
+        Cancel
+      </button>
+      {error && <p className="w-full text-sm text-red-600 dark:text-red-400">{error}</p>}
+    </form>
   );
 }

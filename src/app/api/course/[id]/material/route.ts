@@ -4,7 +4,7 @@ import { previewMaterial } from "@/lib/materials";
 
 export const dynamic = "force-dynamic";
 
-const KEY = /^(file:\d+|page:[A-Za-z0-9._~%-]+)$/;
+const KEY = /^(file:\d+|page:[A-Za-z0-9._~%-]+|web:https?:\/\/\S+|url:https?:\/\/\S+|upload:[a-z0-9]+|notes:main)$/;
 
 /** The extracted text of one material, so students can check what the app reads. Free: no AI call. */
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -14,7 +14,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (blocked) return blocked;
   const id = Number((await ctx.params).id);
   const key = new URL(req.url).searchParams.get("key") ?? "";
-  if (!Number.isInteger(id) || id <= 0 || !KEY.test(key)) return Response.json({ error: "Bad request" }, { status: 400 });
+  if (!Number.isInteger(id) || id === 0 || !KEY.test(key)) return Response.json({ error: "Bad request" }, { status: 400 });
   try {
     return Response.json(await previewMaterial(id, key));
   } catch (e) {

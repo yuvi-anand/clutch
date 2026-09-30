@@ -33,6 +33,42 @@ export type PersonalItem = {
 
 export type PersonalState = { items: PersonalItem[]; notes: string; updatedAt?: string };
 
+/** A dated item pulled from a course website or pasted syllabus. */
+export type CourseEvent = {
+  title: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** "HH:MM", 24-hour, or "" */
+  time: string;
+  kind: "exam" | "quiz" | "homework" | "project" | "lab" | "lecture" | "other";
+  notes: string;
+};
+
+export type Site = {
+  url: string;
+  title: string;
+  addedAt: string;
+  fetchedAt: string;
+  hash: string;
+  pages: { url: string; title: string }[];
+  files: { url: string; name: string; kind: FileKind }[];
+  events: CourseEvent[];
+};
+
+export type UploadedFile = { id: string; name: string; size: number; kind: FileKind; stored: string; addedAt: string };
+
+export type Extras = { sites: Site[]; files: UploadedFile[]; notes: string; notesHash?: string; notesEvents: CourseEvent[] };
+
+export type ManualCourse = { id: number; name: string; code: string; color: string; createdAt: string };
+
+/** What the course page shows about a class's extras. */
+export type ExtrasSummary = {
+  sites: { url: string; title: string; pages: number; files: number; dates: number; fetchedAt: string }[];
+  files: { id: string; name: string; size: number; kind: FileKind }[];
+  notes: string;
+  notesDates: number;
+};
+
 export type Status = {
   canvasConnected: boolean;
   canvasBaseUrl: string | null;
@@ -61,7 +97,7 @@ export type DashItem = {
   status: ItemStatus;
   /** Submitted somewhere other than Canvas (Gradescope, Pawtograder, on paper...). */
   external?: boolean;
-  source: "canvas" | "syllabus" | "module" | "personal" | "website";
+  source: "canvas" | "syllabus" | "module" | "personal" | "website" | "notes";
   detail?: string;
   isAssessment?: boolean;
 };
@@ -74,6 +110,7 @@ export type DashCourse = {
   score: number | null;
   upcoming: number;
   missing: number;
+  manual?: boolean;
 };
 
 export type Dashboard = {
@@ -91,7 +128,7 @@ export type FileKind = "pdf" | "pptx" | "docx" | "text" | "recording" | "legacy"
 export type Material = {
   /** "file:<id>" or "page:<slug>" */
   key: string;
-  kind: "file" | "page";
+  kind: "file" | "page" | "web" | "upload" | "notes";
   title: string;
   module: string;
   fileKind?: FileKind;
@@ -115,10 +152,13 @@ export type CourseInfo = {
   color: string;
   score: number | null;
   url: string;
+  /** Added by the student, not on Canvas. */
+  manual?: boolean;
 };
 
 export type CourseView = {
   course: CourseInfo;
+  extras: ExtrasSummary;
   modules: ModuleView[];
   otherFiles: Material[];
   otherPages: Material[];

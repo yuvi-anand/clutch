@@ -1,8 +1,12 @@
+import fs from "node:fs";
 import type Anthropic from "@anthropic-ai/sdk";
 import { canvas, CanvasError, canvasWebUrl, downloadFile, type CanvasFile, type CanvasModuleItem, type CanvasPage } from "./canvas";
 import { getCached, putCached, remember } from "./cache";
 import { extractFile, fileKind, htmlToMarkdown, KIND_REASON, pdfPageCount } from "./extract";
-import type { Material, MaterialPreview, ModuleEntry, ModuleView, UsedSource } from "./types";
+import { getExtras, uploadPath } from "./extras";
+import { dateKey } from "./text";
+import { fetchFile, fetchPage } from "./web";
+import type { Extras, ExtrasSummary, Material, MaterialPreview, ModuleEntry, ModuleView, UsedSource } from "./types";
 
 export type CourseMaterials = {
   modules: ModuleView[];
@@ -91,7 +95,80 @@ export function modulesOf(courseId: number, force = false) {
   return remember(`modules:${courseId}`, 3 * 60e3, force, () => canvas.modules(courseId));
 }
 
-export function getCourseMaterials(courseId: number, force = false): Promise<CourseMaterials> {
+/** Canvas modules, websites, uploads and notes for a class, in the order the course page shows them. */
+export async function getCourseMaterials(courseId: number, force = false): Promise<CourseMaterials> {
+  const base: CourseMaterials =
+    courseId > 0 ? await canvasMaterials(courseId, force) : { modules: [], otherFiles: [], otherPages: [], all: {} };
+  const extra = extrasModules(getExtras(courseId));
+  const all = { ...base.all };
+  for (const mod of extra) for (const e of mod.entries) if (e.type === "material") all[e.material.key] = e.material;
+  return { modules: [...base.modules, ...extra], otherFiles: base.otherFiles, otherPages: base.otherPages, all };
+}
+
+function extrasModules(ex: Extras): ModuleView[] {
+  const mods: ModuleView[] = [];
+  ex.sites.forEach((site, i) => {
+    const module = `Course website: ${site.title}`;
+    const entries: ModuleEntry[] = [
+      ...site.pages.map((pg) => ({
+        type: "material" as const,
+        material: { key: `web:${pg.url}`, kind: "web" as const, title: pg.title, module, supported: true, url: pg.url },
+      })),
+      ...site.files.map((f) => ({
+        type: "material" as const,
+        material: {
+          key: `url:${f.url}`,
+          kind: "file" as const,
+          fileKind: f.kind,
+          title: f.name,
+          module,
+          supported: READABLE.has(f.kind),
+          reason: READABLE.has(f.kind) ? undefined : KIND_REASON[f.kind],
+          url: f.url,
+        },
+      })),
+    ];
+    mods.push({ id: -1000 - i, name: module, entries });
+  });
+  if (ex.files.length) {
+    mods.push({
+      id: -2000,
+      name: "Your uploaded files",
+      entries: ex.files.map((f) => ({
+        type: "material" as const,
+        material: {
+          key: `upload:${f.id}`,
+          kind: "upload" as const,
+          fileKind: f.kind,
+          title: f.name,
+          module: "Your uploaded files",
+          size: f.size,
+          supported: READABLE.has(f.kind),
+          reason: READABLE.has(f.kind) ? undefined : KIND_REASON[f.kind],
+        },
+      })),
+    });
+  }
+  if (ex.notes.trim()) {
+    mods.push({
+      id: -3000,
+      name: "Your notes",
+      entries: [{ type: "material", material: { key: "notes:main", kind: "notes", title: "Pasted notes and syllabus", module: "Your notes", supported: true } }],
+    });
+  }
+  return mods;
+}
+
+export function summarizeExtras(ex: Extras): ExtrasSummary {
+  return {
+    sites: ex.sites.map((s) => ({ url: s.url, title: s.title, pages: s.pages.length, files: s.files.length, dates: s.events.length, fetchedAt: s.fetchedAt })),
+    files: ex.files.map((f) => ({ id: f.id, name: f.name, size: f.size, kind: f.kind })),
+    notes: ex.notes,
+    notesDates: ex.notesEvents.length,
+  };
+}
+
+function canvasMaterials(courseId: number, force = false): Promise<CourseMaterials> {
   return remember(`materials:${courseId}`, 5 * 60e3, force, async () => {
     const [modules, files, pages] = await Promise.all([
       modulesOf(courseId, force),
@@ -131,6 +208,23 @@ type Loaded =
   | { kind: "pdf"; title: string; data: string; pages: number; bytes: number };
 
 async function loadMaterial(courseId: number, m: Material, visual: boolean): Promise<Loaded> {
+  if (m.kind === "notes") {
+    return { kind: "text", title: "Your notes", text: getExtras(courseId).notes, cached: true, isPdf: false };
+  }
+  if (m.kind === "web") {
+    const page = await fetchPage(m.key.slice("web:".length));
+    return { kind: "text", title: page.title || m.title, text: htmlToMarkdown(page.html), cached: false, isPdf: false };
+  }
+  if (m.kind === "upload") {
+    const f = getExtras(courseId).files.find((x) => `upload:${x.id}` === m.key);
+    if (!f) throw new Error("That uploaded file is gone. Upload it again.");
+    return readBuffer(`upload:${courseId}:${f.id}`, "1", f.name, f.kind, visual, () => fs.readFileSync(uploadPath(courseId, f.stored)));
+  }
+  if (m.key.startsWith("url:")) {
+    const url = m.key.slice("url:".length);
+    // Linked files are re-read at most once a day.
+    return readBuffer(`url:${url}`, dateKey(new Date()), m.title, m.fileKind ?? fileKind(m.title), visual, () => fetchFile(url));
+  }
   if (m.kind === "page") {
     const slug = m.key.slice("page:".length);
     const page = await canvas.page(courseId, slug);
@@ -187,6 +281,27 @@ export async function previewMaterial(courseId: number, key: string): Promise<Ma
     cached: r.cached,
     lowText: r.isPdf && !!r.units && text.length / r.units < 120,
   };
+}
+
+/** Extract a non-Canvas file (upload or linked document), using the text cache. */
+async function readBuffer(
+  cacheKey: string,
+  version: string,
+  name: string,
+  kind: Material["fileKind"] & string,
+  visual: boolean,
+  load: () => Buffer | Promise<Buffer>,
+): Promise<Loaded> {
+  if (!READABLE.has(kind)) throw new Error(KIND_REASON[kind] ?? "This file type isn't supported yet.");
+  if (kind === "pdf" && visual) {
+    const buf = await load();
+    return { kind: "pdf", title: name, data: buf.toString("base64"), pages: await pdfPageCount(buf), bytes: buf.length };
+  }
+  const hit = getCached(cacheKey, version);
+  if (hit) return { kind: "text", title: name, text: hit.text, units: hit.units, unitLabel: hit.unitLabel, cached: true, isPdf: kind === "pdf" };
+  const ex = await extractFile(kind, await load(), name);
+  putCached({ key: cacheKey, version, title: name, text: ex.text, units: ex.units, unitLabel: ex.unitLabel });
+  return { kind: "text", title: name, text: ex.text, units: ex.units, unitLabel: ex.unitLabel, cached: false, isPdf: kind === "pdf" };
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -270,7 +385,15 @@ export async function gatherSources(
     textTokens += tokens;
     sizes.push({ title: r.title, tokens });
     const kindLabel =
-      m.kind === "page" ? "course page" : r.units && r.unitLabel !== "section" ? `course file, ${r.units} ${r.unitLabel}s` : "course file";
+      m.kind === "page"
+        ? "course page"
+        : m.kind === "web"
+          ? "course website page"
+          : m.kind === "notes"
+            ? "notes the student pasted in"
+            : r.units && r.unitLabel !== "section"
+              ? `${m.kind === "upload" ? "uploaded" : "course"} file, ${r.units} ${r.unitLabel}s`
+              : `${m.kind === "upload" ? "uploaded" : "course"} file`;
     out.blocks.push({
       type: "text",
       text: `<source title="${xmlAttr(r.title)}" module="${xmlAttr(m.module)}" kind="${kindLabel}">\n${text}\n</source>`,

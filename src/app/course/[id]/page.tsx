@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
+import { CourseExtras } from "@/components/CourseExtras";
 import { ErrorBox, PageLoading, ScorePill, Spinner } from "@/components/ui";
 import { APP_NAME } from "@/lib/brand";
 import { api, dayKeyOf, fmtDay, fmtTime, setPending } from "@/lib/client";
@@ -144,10 +145,14 @@ function CourseScreen({ courseId }: { courseId: number }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ScorePill score={course.score} />
-          <a href={course.url} target="_blank" rel="noreferrer" className="btn btn-sm">
-            Open in Canvas ↗
-          </a>
+          {course.manual ? <span className="chip">Not on Canvas</span> : <ScorePill score={course.score} />}
+          {course.manual ? (
+            <RemoveClass courseId={courseId} />
+          ) : (
+            <a href={course.url} target="_blank" rel="noreferrer" className="btn btn-sm">
+              Open in Canvas ↗
+            </a>
+          )}
           <button className="btn btn-sm" onClick={() => load(true)} disabled={refreshing}>
             {refreshing ? <Spinner /> : "↻"} Refresh
           </button>
@@ -174,6 +179,9 @@ function CourseScreen({ courseId }: { courseId: number }) {
                 </>
               )}
             </p>
+          </div>
+          <div className="mb-3">
+            <CourseExtras courseId={courseId} extras={data.extras} manual={Boolean(course.manual)} onChange={() => load(true)} />
           </div>
           <Materials data={data} selected={selected} toggle={toggle} preview={setPreviewing} />
         </div>
@@ -278,7 +286,15 @@ function CourseScreen({ courseId }: { courseId: number }) {
 
 function Materials({ data, selected, toggle, preview }: { data: CourseView; selected: Set<string>; toggle: Toggle; preview: Preview }) {
   const empty = data.modules.every((m) => m.entries.length === 0) && !data.otherFiles.length && !data.otherPages.length;
-  if (empty) return <div className="card p-6 text-sm muted">This course doesn&apos;t have any modules or files on Canvas yet.</div>;
+  if (empty) {
+    return (
+      <div className="card p-6 text-sm muted">
+        {data.course.manual
+          ? "No materials yet. Add a website, upload files or paste the syllabus above, then pick what to study."
+          : "This course doesn't have any modules or files on Canvas yet."}
+      </div>
+    );
+  }
   return (
     <div className="space-y-3">
       {data.modules.map((m) => (
@@ -393,6 +409,8 @@ const KIND_TAG: Record<string, [string, string]> = {
   docx: ["Doc", "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"],
   text: ["Text", "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300"],
   page: ["Page", "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"],
+  web: ["Web", "bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"],
+  notes: ["Notes", "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"],
   recording: ["Video", "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400"],
   legacy: ["Office", "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400"],
   unsupported: ["File", "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400"],
@@ -401,7 +419,7 @@ const KIND_TAG: Record<string, [string, string]> = {
 const fmtSize = (b: number) => (b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
 
 function MaterialRow({ m, selected, toggle, preview }: { m: Material; selected: Set<string>; toggle: Toggle; preview: Preview }) {
-  const tag = KIND_TAG[m.kind === "page" ? "page" : (m.fileKind ?? "unsupported")] ?? KIND_TAG.unsupported;
+  const tag = KIND_TAG[m.kind === "page" || m.kind === "web" || m.kind === "notes" ? m.kind : (m.fileKind ?? "unsupported")] ?? KIND_TAG.unsupported;
   const on = selected.has(m.key);
   return (
     <li>
@@ -521,5 +539,34 @@ function PreviewModal({ courseId, material, onClose }: { courseId: number; mater
         </div>
       </div>
     </div>
+  );
+}
+
+function RemoveClass({ courseId }: { courseId: number }) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <button className="btn btn-sm" onClick={() => setConfirming(true)}>
+        Remove class
+      </button>
+    );
+  }
+  return (
+    <span className="flex items-center gap-2 text-sm">
+      Remove it and its uploaded files?
+      <button
+        className="btn btn-sm border-red-300 text-red-700 dark:border-red-800 dark:text-red-300"
+        onClick={async () => {
+          await api("/api/courses/manual", { action: "delete", id: courseId }).catch(() => {});
+          router.push("/");
+        }}
+      >
+        Remove
+      </button>
+      <button className="btn btn-sm" onClick={() => setConfirming(false)}>
+        Keep
+      </button>
+    </span>
   );
 }
