@@ -5,6 +5,7 @@ import { CanvasError, checkCanvas } from "@/lib/canvas";
 import { normalizeBaseUrl, readConfig, updateConfig } from "@/lib/config";
 import { errorMessage, guard } from "@/lib/http";
 import { availableModels, checkApiKey, forgetModels } from "@/lib/models";
+import { runCommand } from "@/lib/localEngine";
 import { publicStatus } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,8 @@ const Body = z.object({
   canvasToken: z.string().max(1000).optional(),
   anthropicApiKey: z.string().max(1000).optional(),
   model: z.string().max(100).optional(),
-  clear: z.enum(["canvas", "ai"]).optional(),
+  aiCommand: z.string().max(2000).optional(),
+  clear: z.enum(["canvas", "ai", "command"]).optional(),
 });
 
 export async function POST(req: Request) {
@@ -32,6 +34,10 @@ export async function POST(req: Request) {
   if (b.clear === "canvas") {
     updateConfig({ canvasToken: undefined });
     forget("");
+    return Response.json({ errors, status: await publicStatus() });
+  }
+  if (b.clear === "command") {
+    updateConfig({ aiCommand: undefined });
     return Response.json({ errors, status: await publicStatus() });
   }
   if (b.clear === "ai") {
@@ -73,6 +79,26 @@ export async function POST(req: Request) {
     } catch (e) {
       errors.ai = errorMessage(e);
       console.warn(`API key check failed: ${errors.ai}`);
+    }
+  }
+
+  // A local AI command (e.g. one signed in with the student's own subscription):
+  // save it, then prove it works with a tiny prompt.
+  if (b.aiCommand?.trim()) {
+    const command = b.aiCommand.trim();
+    try {
+      const reply = await runCommand(command, {
+        system: "You are a connection test. Reply with exactly the word OK.",
+        content: "Reply with exactly the word OK.",
+        effort: "low",
+        signal: AbortSignal.any([req.signal, AbortSignal.timeout(120_000)]),
+      });
+      if (!/\bok\b/i.test(reply)) throw new Error(`The command ran, but replied "${reply.slice(0, 120)}" instead of OK.`);
+      updateConfig({ aiCommand: command });
+      aiOk = true;
+    } catch (e) {
+      errors.ai = errorMessage(e);
+      console.warn(`AI command check failed: ${errors.ai}`);
     }
   }
 

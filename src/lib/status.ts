@@ -13,6 +13,7 @@ export async function publicStatus(): Promise<Status> {
     canvasBaseUrl: c.canvasBaseUrl ?? null,
     aiConfigured: engine !== "none",
     engine,
+    aiCommand: c.aiCommand ?? "",
     model: engine === "command" ? "command" : (c.model ?? models[0]?.id ?? ""),
     models,
     canvasFromEnv: Boolean(process.env.CANVAS_TOKEN),

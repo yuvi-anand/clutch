@@ -43,6 +43,7 @@ export function demoStatus(): Status {
     canvasBaseUrl: "https://canvas.example.edu",
     aiConfigured: true,
     engine: "api",
+    aiCommand: "",
     model: "demo",
     models: [{ id: "demo", label: "Sample data", note: "Demo mode" }],
     canvasFromEnv: false,

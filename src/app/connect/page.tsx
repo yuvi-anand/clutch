@@ -27,6 +27,7 @@ export default function ConnectPage() {
   const [baseUrl, setBaseUrl] = useState("");
   const [token, setToken] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [command, setCommand] = useState("");
   const [model, setModel] = useState("");
   const [modelTouched, setModelTouched] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,6 +39,7 @@ export default function ConnectPage() {
       .then((s) => {
         setStatus(s);
         setBaseUrl(s.canvasBaseUrl ?? "");
+        setCommand(s.aiCommand);
         setModel(s.model);
       })
       .catch((e) => setError((e as Error).message));
@@ -53,12 +55,14 @@ export default function ConnectPage() {
         canvasBaseUrl: baseUrl.trim() || undefined,
         canvasToken: token.trim() || undefined,
         anthropicApiKey: apiKey.trim() || undefined,
+        aiCommand: command.trim() && command.trim() !== status?.aiCommand ? command.trim() : undefined,
         model: modelTouched ? model : undefined,
       });
       setResult(r);
       setStatus(r.status);
       setModel(r.status.model);
       setModelTouched(false);
+      setCommand(r.status.aiCommand || command);
       if (!r.errors.canvas) setToken("");
       if (!r.errors.ai) setApiKey("");
     } catch (err) {
@@ -68,7 +72,7 @@ export default function ConnectPage() {
     }
   }
 
-  async function disconnect(which: "canvas" | "ai") {
+  async function disconnect(which: "canvas" | "ai" | "command") {
     const r = await api<ConnectResult>("/api/connect", { clear: which });
     setStatus(r.status);
     setResult(null);
@@ -152,21 +156,40 @@ export default function ConnectPage() {
 
         <section className="card p-6">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">2. AI model</h2>
+            <h2 className="text-lg font-semibold">2. AI</h2>
             {status.engine === "command" ? (
               <span className={OK}>Using local AI command</span>
             ) : (
               status.aiConfigured && <span className={OK}>Key saved</span>
             )}
           </div>
-          {status.engine === "command" && (
-            <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-              Guides, quizzes and plans run through the local AI command in your config, so no API key or credits are needed. An API key
-              is only used if you remove that command.
+          <div className="mt-4 rounded-lg border border-stone-200 p-4 dark:border-stone-800">
+            <p className="text-sm font-medium">Use the AI tool on this computer</p>
+            <p className="mt-0.5 text-xs muted">
+              Runs through an AI app you&apos;re already signed in to, like a school subscription, so there&apos;s no API key or cost.
+              Paste the command from your setup guide, then click Save and test.
             </p>
-          )}
-          <label className="mt-4 block">
-            <span className="text-sm font-medium">Anthropic API key</span>
+            <textarea
+              id="ai-command"
+              rows={3}
+              className="input mt-2 font-mono text-xs"
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              placeholder="Paste the command from your setup guide"
+              spellCheck={false}
+            />
+            {status.engine === "command" && command === status.aiCommand && (
+              <div className="mt-2 flex items-center gap-3 text-xs">
+                <span className="text-emerald-700 dark:text-emerald-400">✓ In use</span>
+                <button type="button" onClick={() => disconnect("command")} className="muted hover:underline">
+                  Stop using it
+                </button>
+              </div>
+            )}
+          </div>
+          <p className="mt-4 text-sm font-medium">Or use an API key</p>
+          <label className="mt-2 block">
+            <span className="text-xs muted">Anthropic API key (only used when no AI tool is set above)</span>
             <input
               type="password"
               autoComplete="off"
@@ -206,7 +229,7 @@ export default function ConnectPage() {
             </div>
           </fieldset>
           {status.aiFromEnv && <p className="mt-2 text-xs muted">Using ANTHROPIC_API_KEY from .env.local.</p>}
-          {result?.aiOk && <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">✓ The API key works</p>}
+          {result?.aiOk && <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">✓ Connected. The AI answered the test.</p>}
           {result?.errors.ai && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{result.errors.ai}</p>}
           {status.aiConfigured && !status.aiFromEnv && (
             <button type="button" onClick={() => disconnect("ai")} className="mt-3 text-xs muted hover:underline">

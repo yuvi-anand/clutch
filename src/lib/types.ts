@@ -75,6 +75,8 @@ export type Status = {
   aiConfigured: boolean;
   /** "command" = the local AI command from your config; "api" = API key. */
   engine: "api" | "command" | "none";
+  /** The local AI command, if one is set (it is not a secret). */
+  aiCommand: string;
   model: string;
   models: ModelOption[];
   canvasFromEnv: boolean;
