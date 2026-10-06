@@ -220,7 +220,7 @@ export type SavedBase = {
 export type GuideType = "guide" | "practice" | "cheatsheet";
 
 /** A margin note: a question about a highlighted passage, and its answer. */
-export type GuideNote = { id: string; quote: string; question: string; answer: string; createdAt: string };
+export type GuideNote = { id: string; quote: string; occurrence?: number; question: string; answer: string; createdAt: string };
 
 export type SavedGuide = SavedBase & { type: GuideType; markdown: string; truncated?: boolean; notes?: GuideNote[] };
 

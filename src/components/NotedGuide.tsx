@@ -10,13 +10,13 @@ import { DEFAULT_NOTE_QUESTION, type GuideNote, type SavedGuide } from "@/lib/ty
 // sticky note in the margin beside that passage (or below the guide on narrow
 // screens). Notes are saved with the guide.
 
-type Pending = { quote: string; question: string; answer: string; error?: string };
-type Ask = { quote: string; x: number; y: number; open: boolean };
+type Pending = { quote: string; occurrence: number; question: string; answer: string; error?: string };
+type Ask = { quote: string; occurrence: number; x: number; y: number; open: boolean };
 
-/** Find the quote in the rendered guide, ignoring whitespace (selections span blocks and inline tags). */
-function findRange(root: HTMLElement, quote: string): Range | null {
+/** Every place the quote appears in the rendered guide, ignoring whitespace (selections span blocks and inline tags). */
+function findRanges(root: HTMLElement, quote: string): Range[] {
   const target = quote.replace(/\s+/g, "");
-  if (!target) return null;
+  if (!target) return [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let flat = "";
   const map: [Text, number][] = [];
@@ -27,14 +27,28 @@ function findRange(root: HTMLElement, quote: string): Range | null {
       map.push([n, i]);
     }
   }
-  const at = flat.indexOf(target);
-  if (at < 0) return null;
-  const [startNode, startOffset] = map[at];
-  const [endNode, endOffset] = map[at + target.length - 1];
-  const range = document.createRange();
-  range.setStart(startNode, startOffset);
-  range.setEnd(endNode, endOffset + 1);
-  return range;
+  const out: Range[] = [];
+  for (let at = flat.indexOf(target); at >= 0; at = flat.indexOf(target, at + 1)) {
+    const [startNode, startOffset] = map[at];
+    const [endNode, endOffset] = map[at + target.length - 1];
+    const range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset + 1);
+    out.push(range);
+  }
+  return out;
+}
+
+function findRange(root: HTMLElement, quote: string, occurrence = 0): Range | null {
+  const all = findRanges(root, quote);
+  return all[occurrence] ?? all[0] ?? null;
+}
+
+/** Which copy of the quote the selection is on (0 when it appears once). */
+function occurrenceOf(root: HTMLElement, quote: string, sel: Range): number {
+  const all = findRanges(root, quote);
+  const i = all.findIndex((r) => r.compareBoundaryPoints(Range.END_TO_START, sel) <= 0 && r.compareBoundaryPoints(Range.START_TO_END, sel) >= 0);
+  return Math.max(0, i);
 }
 
 type HighlightRegistry = { set: (name: string, h: unknown) => void; delete: (name: string) => void };
@@ -64,11 +78,14 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
   useLayoutEffect(() => {
     const body = bodyRef.current;
     if (!body) return;
-    const all = [...notes.map((n) => ({ key: n.id, quote: n.quote })), ...(pending ? [{ key: "pending", quote: pending.quote }] : [])];
+    const all = [
+      ...notes.map((n) => ({ key: n.id, quote: n.quote, occurrence: n.occurrence ?? 0 })),
+      ...(pending ? [{ key: "pending", quote: pending.quote, occurrence: pending.occurrence }] : []),
+    ];
     const base = body.getBoundingClientRect().top;
     const ranges: Range[] = [];
     const wanted = all.map((n, i) => {
-      const r = findRange(body, n.quote);
+      const r = findRange(body, n.quote, n.occurrence);
       if (r) ranges.push(r);
       return { key: n.key, top: r ? r.getBoundingClientRect().top - base : Number.MAX_SAFE_INTEGER - all.length + i };
     });
@@ -88,7 +105,8 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
 
   useEffect(() => () => highlights()?.delete("clutch-notes"), []);
 
-  const onMouseUp = useCallback(() => {
+  const onMouseUp = useCallback((e: MouseEvent) => {
+    if ((e.target as Element | null)?.closest?.("[data-ask-box]")) return;
     setTimeout(() => {
       const sel = window.getSelection();
       const text = sel?.toString().trim() ?? "";
@@ -101,7 +119,8 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
       const rect = sel.getRangeAt(0).getBoundingClientRect();
       const host = rootRef.current?.getBoundingClientRect();
       const x = Math.min(Math.max(rect.left + rect.width / 2, 170), window.innerWidth - 170) - (host?.left ?? 0);
-      setAsk({ quote: text.slice(0, 4000), x, y: rect.bottom + 8 - (host?.top ?? 0), open: false });
+      const quote = text.slice(0, 4000);
+      setAsk({ quote, occurrence: occurrenceOf(body!, quote, sel.getRangeAt(0)), x, y: rect.bottom + 8 - (host?.top ?? 0), open: false });
     }, 0);
   }, []);
 
@@ -114,7 +133,10 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
   useEffect(() => {
     if (!ask) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setAsk(null);
-    const outside = () => setAsk(null);
+    const outside = (e: MouseEvent) => {
+      if ((e.target as Element | null)?.closest?.("[data-ask-box]")) return;
+      setAsk(null);
+    };
     window.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", outside);
     return () => {
@@ -125,22 +147,22 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
 
   async function submit() {
     if (!ask) return;
-    const quote = ask.quote;
+    const { quote, occurrence } = ask;
     const q = question.trim();
     setAsk(null);
     setQuestion("");
     window.getSelection()?.removeAllRanges();
-    setPending({ quote, question: q || DEFAULT_NOTE_QUESTION, answer: "" });
+    setPending({ quote, occurrence, question: q || DEFAULT_NOTE_QUESTION, answer: "" });
     let answer = "";
     try {
-      await streamEvents(`/api/items/guide/${guide.id}/notes`, { action: "ask", quote, question: q }, (ev) => {
+      await streamEvents(`/api/items/guide/${guide.id}/notes`, { action: "ask", quote, occurrence, question: q }, (ev) => {
         if (ev.t === "text") {
           answer += ev.text;
           setPending((p) => p && { ...p, answer });
         } else if (ev.t === "error") {
           setPending((p) => p && { ...p, error: ev.message });
         } else if (ev.t === "done") {
-          setNotes((n) => [...n, { id: ev.id, quote, question: q || DEFAULT_NOTE_QUESTION, answer: answer.trim(), createdAt: new Date().toISOString() }]);
+          setNotes((n) => [...n, { id: ev.id, quote, occurrence, question: q || DEFAULT_NOTE_QUESTION, answer: answer.trim(), createdAt: new Date().toISOString() }]);
           setPending(null);
         }
       });
@@ -170,7 +192,9 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
       <p className="line-clamp-2 border-l-2 border-amber-400 pl-2 text-xs italic muted">“{c.quote}”</p>
       <p className="mt-2 text-xs font-semibold">{c.question}</p>
       {c.answer ? (
-        <Markdown className="prose-sm mt-1">{c.answer}</Markdown>
+        <div className={placed ? "mt-1 max-h-56 overflow-y-auto pr-1" : "mt-1"}>
+          <Markdown className="prose-sm">{c.answer}</Markdown>
+        </div>
       ) : (
         !c.error && (
           <p className="mt-1 flex items-center gap-2 text-xs muted">
@@ -207,7 +231,7 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
       {cards.length > 0 && <div className="mt-6 space-y-3 lg:hidden print:hidden">{cards.map((c) => card(c, false))}</div>}
 
       {ask && (
-        <div className="absolute z-40 -translate-x-1/2 print:hidden" style={{ left: ask.x, top: ask.y }} onMouseDown={(e) => e.stopPropagation()}>
+        <div data-ask-box className="absolute z-40 -translate-x-1/2 print:hidden" style={{ left: ask.x, top: ask.y }} onMouseDown={(e) => e.stopPropagation()}>
           {!ask.open ? (
             <button
               className="btn btn-primary btn-sm shadow-lg"

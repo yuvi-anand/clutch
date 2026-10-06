@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ kind: string; id: string }> };
 
 const Body = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("ask"), quote: z.string().trim().min(2).max(4000), question: z.string().trim().max(2000).default("") }),
+  z.object({ action: z.literal("ask"), quote: z.string().trim().min(2).max(4000), occurrence: z.number().int().min(0).max(500).default(0), question: z.string().trim().max(2000).default("") }),
   z.object({ action: z.literal("delete"), noteId: z.string().max(60) }),
 ]);
 
@@ -56,7 +56,7 @@ export async function POST(req: Request, ctx: Ctx) {
       signal,
       onText: (text) => send({ t: "text", text }),
     });
-    const note = { id: newId(), quote: b.quote, question: b.question || DEFAULT_NOTE_QUESTION, answer: result.text.trim(), createdAt: new Date().toISOString() };
+    const note = { id: newId(), quote: b.quote, occurrence: b.occurrence, question: b.question || DEFAULT_NOTE_QUESTION, answer: result.text.trim(), createdAt: new Date().toISOString() };
     const fresh = loadItem("guide", id) ?? guide;
     saveItem("guide", { ...fresh, notes: [...(fresh.notes ?? []), note] });
     send({ t: "done", id: note.id, cost: result.cost });
