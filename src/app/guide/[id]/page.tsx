@@ -143,7 +143,7 @@ function GuideView({ id }: { id: string }) {
   }
 
   return (
-    <article className="mx-auto max-w-3xl xl:mr-[20rem] xl:ml-auto">
+    <article className="mx-auto max-w-3xl lg:mr-[17rem] lg:ml-0 xl:mr-[20rem] xl:ml-auto">
       <Link href={`/course/${g.courseId}`} className="text-sm muted hover:underline print:hidden">
         ← {g.courseName}
       </Link>

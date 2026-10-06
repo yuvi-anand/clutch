@@ -43,6 +43,7 @@ const HighlightCtor = () => (typeof window !== "undefined" ? (window as unknown 
 
 export function NotedGuide({ guide }: { guide: SavedGuide }) {
   const bodyRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const noteRefs = useRef(new Map<string, HTMLDivElement>());
   const [notes, setNotes] = useState<GuideNote[]>(guide.notes ?? []);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -91,26 +92,32 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
     setTimeout(() => {
       const sel = window.getSelection();
       const text = sel?.toString().trim() ?? "";
-      if (!sel || sel.rangeCount === 0 || text.length < 3 || !bodyRef.current?.contains(sel.anchorNode)) {
+      const body = bodyRef.current;
+      const inside = Boolean(body && sel && sel.rangeCount > 0 && body.contains(sel.getRangeAt(0).commonAncestorContainer));
+      if (!sel || !inside || text.length < 3) {
         setAsk((a) => (a?.open ? a : null));
         return;
       }
       const rect = sel.getRangeAt(0).getBoundingClientRect();
-      setAsk({ quote: text.slice(0, 4000), x: Math.min(Math.max(rect.left + rect.width / 2, 160), window.innerWidth - 160), y: rect.bottom + 8, open: false });
+      const host = rootRef.current?.getBoundingClientRect();
+      const x = Math.min(Math.max(rect.left + rect.width / 2, 170), window.innerWidth - 170) - (host?.left ?? 0);
+      setAsk({ quote: text.slice(0, 4000), x, y: rect.bottom + 8 - (host?.top ?? 0), open: false });
     }, 0);
   }, []);
 
-  // Close the floating button or box on scroll, Escape, or a click elsewhere.
+  useEffect(() => {
+    document.addEventListener("mouseup", onMouseUp);
+    return () => document.removeEventListener("mouseup", onMouseUp);
+  }, [onMouseUp]);
+
+  // Close the floating button or box on Escape or a click elsewhere.
   useEffect(() => {
     if (!ask) return;
-    const close = () => setAsk((a) => (a?.open ? a : null));
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setAsk(null);
     const outside = () => setAsk(null);
-    window.addEventListener("scroll", close, { passive: true });
     window.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", outside);
     return () => {
-      window.removeEventListener("scroll", close);
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", outside);
     };
@@ -187,20 +194,20 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
   );
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       <p className="mb-2 text-xs muted print:hidden">Highlight any passage to ask about it. Answers stay as notes beside it.</p>
       <div className="relative">
-        <div ref={bodyRef} onMouseUp={onMouseUp} className="card p-6 sm:p-8 print:border-0 print:p-0 print:shadow-none">
+        <div ref={bodyRef} className="card p-6 sm:p-8 print:border-0 print:p-0 print:shadow-none">
           <GuideBody markdown={guide.markdown} />
         </div>
         {/* Wide screens: notes float in the right margin, level with their passage. */}
-        <div className="absolute top-0 left-full ml-6 hidden w-72 xl:block print:hidden">{cards.map((c) => card(c, true))}</div>
+        <div className="absolute top-0 left-full ml-4 hidden w-64 lg:block xl:ml-6 xl:w-72 print:hidden">{cards.map((c) => card(c, true))}</div>
       </div>
       {/* Narrow screens: notes stack below the guide. */}
-      {cards.length > 0 && <div className="mt-6 space-y-3 xl:hidden print:hidden">{cards.map((c) => card(c, false))}</div>}
+      {cards.length > 0 && <div className="mt-6 space-y-3 lg:hidden print:hidden">{cards.map((c) => card(c, false))}</div>}
 
       {ask && (
-        <div className="fixed z-40 -translate-x-1/2 print:hidden" style={{ left: ask.x, top: ask.y }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="absolute z-40 -translate-x-1/2 print:hidden" style={{ left: ask.x, top: ask.y }} onMouseDown={(e) => e.stopPropagation()}>
           {!ask.open ? (
             <button
               className="btn btn-primary btn-sm shadow-lg"
