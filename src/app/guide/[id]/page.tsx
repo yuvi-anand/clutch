@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { InlineFeedback } from "@/components/Feedback";
 import { GuideBody } from "@/components/Markdown";
+import { NotedGuide } from "@/components/NotedGuide";
 import { ErrorBox, PageLoading, Spinner, useStreamText } from "@/components/ui";
 import { api, clearPending, fmtDateTime, getPending, money, setPending, streamEvents } from "@/lib/client";
 import { MODE_LABELS, type GenerateRequest, type Mode, type SavedGuide } from "@/lib/types";
@@ -142,7 +143,7 @@ function GuideView({ id }: { id: string }) {
   }
 
   return (
-    <article className="mx-auto max-w-3xl">
+    <article className="mx-auto max-w-3xl xl:mr-[20rem] xl:ml-auto">
       <Link href={`/course/${g.courseId}`} className="text-sm muted hover:underline print:hidden">
         ← {g.courseName}
       </Link>
@@ -188,8 +189,8 @@ function GuideView({ id }: { id: string }) {
           This stopped early because it hit the length limit. Pick fewer materials for a complete guide.
         </p>
       )}
-      <div className="card mt-6 p-6 sm:p-8 print:border-0 print:p-0 print:shadow-none">
-        <GuideBody markdown={g.markdown} />
+      <div className="mt-6">
+        <NotedGuide guide={g} />
       </div>
       <div className="mt-6 print:hidden">
         <p className="text-xs font-semibold tracking-wide uppercase muted">Built from</p>

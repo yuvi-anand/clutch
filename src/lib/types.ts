@@ -219,7 +219,10 @@ export type SavedBase = {
 
 export type GuideType = "guide" | "practice" | "cheatsheet";
 
-export type SavedGuide = SavedBase & { type: GuideType; markdown: string; truncated?: boolean };
+/** A margin note: a question about a highlighted passage, and its answer. */
+export type GuideNote = { id: string; quote: string; question: string; answer: string; createdAt: string };
+
+export type SavedGuide = SavedBase & { type: GuideType; markdown: string; truncated?: boolean; notes?: GuideNote[] };
 
 export type QuizQuestion = {
   type: "mcq" | "short";
@@ -255,6 +258,8 @@ export type LibraryEntry = {
   topics?: string;
   createdAt: string;
 };
+
+export const DEFAULT_NOTE_QUESTION = "Explain this in more detail.";
 
 export const MODE_LABELS: Record<Mode, string> = {
   guide: "Study guide",

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { APP_NAME } from "./brand";
-import type { Mode } from "./types";
+import { DEFAULT_NOTE_QUESTION, type Mode } from "./types";
 
 // One system prompt for every study mode, so the (large) course materials that
 // follow it form an identical prefix and hit the prompt cache when the student
@@ -201,4 +201,21 @@ List every dated item a student needs to plan for:
 - lectures: the topic of each dated class meeting (kind "lecture"), with the topic as the title, like "Dynamic programming"
 
 Use date YYYY-MM-DD, and time "HH:MM" (24-hour) only when a time is given, otherwise "". Keep titles short, like "Homework 2" or "Midterm 1". Put rooms, what an exam covers, or "tentative" in notes, otherwise "". Skip items without a specific date (like "final exam: TBD"), and never guess a date.`;
+}
+
+
+export function notePrompt(guide: string, quote: string, question: string): string {
+  return `The student is reading this study guide you wrote for them:
+<study_guide>
+${guide}
+</study_guide>
+
+They highlighted this passage:
+<highlight>
+${quote}
+</highlight>
+
+Their question: ${question || DEFAULT_NOTE_QUESTION}
+
+Your answer appears as a note in the margin beside the passage. Make it clear and concrete, usually 80 to 200 words. Ground it in the course materials and cite like [file p.N] where it helps. Use a short example if it makes the idea click. No headings, and don't restate the question.`;
 }

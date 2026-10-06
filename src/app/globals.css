@@ -56,3 +56,8 @@ details > summary {
 details > summary::-webkit-details-marker {
   display: none;
 }
+
+/* Passages that have a margin note. */
+::highlight(clutch-notes) {
+  background-color: rgb(250 204 21 / 0.35);
+}
