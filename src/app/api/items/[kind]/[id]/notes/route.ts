@@ -51,8 +51,8 @@ export async function POST(req: Request, ctx: Ctx) {
     const result = await runModel({
       system: TUTOR_SYSTEM,
       content: [...sources, { type: "text", text: notePrompt(guide.markdown, b.quote, b.question) }],
-      effort: "medium",
-      maxTokens: 8000,
+      effort: "low",
+      maxTokens: 4000,
       signal,
       onText: (text) => send({ t: "text", text }),
     });

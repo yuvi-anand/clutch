@@ -217,5 +217,5 @@ ${quote}
 
 Their question: ${question || DEFAULT_NOTE_QUESTION}
 
-Your answer appears as a note in the margin beside the passage. Make it clear and concrete, usually 80 to 200 words. Ground it in the course materials and cite like [file p.N] where it helps. Use a short example if it makes the idea click. No headings, and don't restate the question.`;
+Your answer appears as a small note in the margin beside the passage, so keep it short: 2 to 4 sentences, under 80 words. Start with the direct answer. For a term, say what it means in plain words and add one quick example; mention how it differs from a related term only if the student would likely mix them up. Be accurate to the course materials, and add one short citation like [file p.N] if it helps. No headings, no lists unless they are shorter than the sentences would be, and don't restate the question or the highlight.`;
 }
