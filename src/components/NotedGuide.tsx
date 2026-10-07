@@ -65,6 +65,7 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
   const [question, setQuestion] = useState("");
   const [tops, setTops] = useState<Record<string, number>>({});
   const [layoutTick, setLayoutTick] = useState(0);
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   // Re-place notes when the guide's layout changes (answer key opened, window resized).
   useEffect(() => {
@@ -189,7 +190,36 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
       style={placed ? { top: tops[c.key] ?? 0 } : undefined}
       className={`${placed ? "absolute inset-x-0 transition-[top] duration-200" : ""} rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40`}
     >
-      <p className="line-clamp-2 border-l-2 border-amber-400 pl-2 text-xs italic muted">“{c.quote}”</p>
+      <div className="flex items-start gap-2">
+        <p className="line-clamp-2 min-w-0 flex-1 border-l-2 border-amber-400 pl-2 text-xs italic muted">“{c.quote}”</p>
+        {c.key !== "pending" && (
+          <button
+            onClick={() => setConfirming(c.key)}
+            title="Delete note"
+            aria-label="Delete note"
+            className="-mt-1 -mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-md text-base leading-none muted hover:bg-amber-100 hover:text-red-700 dark:hover:bg-amber-900/50 dark:hover:text-red-300"
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {confirming === c.key && (
+        <div className="mt-2 flex items-center gap-2 rounded-md bg-white/70 px-2 py-1.5 text-xs dark:bg-stone-900/60">
+          <span className="flex-1">Delete this note?</span>
+          <button
+            onClick={() => {
+              setConfirming(null);
+              remove(c.key);
+            }}
+            className="font-semibold text-red-700 hover:underline dark:text-red-300"
+          >
+            Delete
+          </button>
+          <button onClick={() => setConfirming(null)} className="muted hover:underline">
+            Keep
+          </button>
+        </div>
+      )}
       <p className="mt-2 text-xs font-semibold">{c.question}</p>
       {c.answer ? (
         <div className={placed ? "mt-1 max-h-56 overflow-y-auto pr-1" : "mt-1"}>
@@ -209,11 +239,7 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
             Dismiss
           </button>
         )
-      ) : (
-        <button onClick={() => remove(c.key)} className="mt-2 text-xs muted hover:underline">
-          Remove note
-        </button>
-      )}
+      ) : null}
     </div>
   );
 
