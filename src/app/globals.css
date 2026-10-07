@@ -57,12 +57,13 @@ details > summary::-webkit-details-marker {
   display: none;
 }
 
-/* Passages that have a margin note: a soft tint and an underline, so it reads
-   cleanly across formulas (where each symbol is its own box) as well as text. */
+/* Passages that have a margin note. Text gets a soft fill; a formula gets one
+   rounded mark around the whole thing, since KaTeX draws each symbol separately. */
 ::highlight(clutch-notes) {
-  background-color: rgb(250 204 21 / 0.12);
-  text-decoration: underline;
-  text-decoration-color: rgb(234 179 8 / 0.85);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
+  background-color: rgb(250 204 21 / 0.35);
+}
+.katex[data-noted] {
+  background-color: rgb(250 204 21 / 0.2);
+  border-radius: 6px;
+  box-shadow: 0 0 0 4px rgb(250 204 21 / 0.2);
 }

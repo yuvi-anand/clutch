@@ -39,6 +39,21 @@ function findRanges(root: HTMLElement, quote: string): Range[] {
   return out;
 }
 
+/** The parts of a range that are ordinary text, leaving out formulas. */
+function textOnly(range: Range): Range[] {
+  const rootNode = range.commonAncestorContainer;
+  const walker = document.createTreeWalker(rootNode.nodeType === Node.TEXT_NODE ? rootNode.parentNode! : rootNode, NodeFilter.SHOW_TEXT);
+  const out: Range[] = [];
+  for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+    if (!range.intersectsNode(n) || n.parentElement?.closest(".katex")) continue;
+    const part = document.createRange();
+    part.setStart(n, n === range.startContainer ? range.startOffset : 0);
+    part.setEnd(n, n === range.endContainer ? range.endOffset : n.data.length);
+    if (!part.collapsed) out.push(part);
+  }
+  return out;
+}
+
 function findRange(root: HTMLElement, quote: string, occurrence = 0): Range | null {
   const all = findRanges(root, quote);
   return all[occurrence] ?? all[0] ?? null;
@@ -101,7 +116,16 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
     setTops((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     const reg = highlights();
     const Ctor = HighlightCtor();
-    if (reg && Ctor) reg.set("clutch-notes", new Ctor(...ranges));
+    // Text gets the highlight; each formula gets one rounded mark instead of a box per symbol.
+    body.querySelectorAll("[data-noted]").forEach((el) => el.removeAttribute("data-noted"));
+    const textRanges: Range[] = [];
+    for (const r of ranges) {
+      body.querySelectorAll(".katex").forEach((el) => {
+        if (r.intersectsNode(el)) el.setAttribute("data-noted", "");
+      });
+      textRanges.push(...textOnly(r));
+    }
+    if (reg && Ctor) reg.set("clutch-notes", new Ctor(...textRanges));
   }, [notes, pending, layoutTick]);
 
   useEffect(() => () => highlights()?.delete("clutch-notes"), []);
