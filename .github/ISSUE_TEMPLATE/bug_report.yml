@@ -4,7 +4,7 @@ labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: "Please don't paste your Canvas token, grades or course files here. Check [TROUBLESHOOTING.md](https://github.com/yuvi-anand/clutch/blob/main/TROUBLESHOOTING.md) first."
+      value: "Please don't paste your Canvas token, grades or course files here. Check [the troubleshooting guide](https://github.com/yuvi-anand/clutch/blob/main/docs/troubleshooting.md) first."
   - type: textarea
     id: what
     attributes:

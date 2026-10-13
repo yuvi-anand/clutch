@@ -2,13 +2,14 @@
 # Clutch setup: installs what's missing, signs you in to Claude with your own
 # subscription, connects Canvas, and builds the app. Safe to run again any time.
 #
-#   ./setup.sh             full setup
-#   ./setup.sh --ai        only redo the Claude step
-#   ./setup.sh --canvas    only redo the Canvas step
-#   ./setup.sh --no-start  don't offer to open Clutch at the end
+#   scripts/setup.sh             full setup
+#   scripts/setup.sh --ai        only redo the Claude step
+#   scripts/setup.sh --canvas    only redo the Canvas step
+#   scripts/setup.sh --no-start  don't offer to open Clutch at the end
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
+SETUP="$PWD/scripts/setup.sh"
 
 ONLY=""
 START=1
@@ -17,7 +18,7 @@ for arg in "$@"; do
     --ai) ONLY=ai ;;
     --canvas) ONLY=canvas ;;
     --no-start) START=0 ;;
-    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,9p' "$SETUP" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (try --help)"; exit 1 ;;
   esac
 done
@@ -81,11 +82,12 @@ if [ -z "$ONLY" ]; then
     if [ "$OS" = Darwin ] && command -v brew >/dev/null 2>&1 && ask "Install it with Homebrew now?" Y; then
       brew install node || die "Homebrew couldn't install Node.js."
     else
-      info "Download the LTS installer from ${B}https://nodejs.org${N}, run it, then run this setup again."
+      info "Download the LTS installer from ${B}https://nodejs.org${N}, run it, then run this in Terminal:"
+      info "  ${B}$SETUP${N}"
       open_url "https://nodejs.org/en/download"
       exit 1
     fi
-    node_ok || die "Node.js still isn't available. Open a new terminal window and run ./setup.sh again."
+    node_ok || die "Node.js still isn't available. Open a new Terminal window and run $SETUP"
     ok "Node.js $(node -v)"
   fi
 
@@ -95,7 +97,7 @@ if [ -z "$ONLY" ]; then
   fi
   ok "Packages installed"
 else
-  node_ok || die "Node.js 20.9+ is missing. Run ./setup.sh without options first."
+  node_ok || die "Node.js 20.9+ is missing. Run $SETUP first."
 fi
 
 # ---------- 2. Claude (your subscription) ----------
@@ -108,7 +110,7 @@ find_claude() {
 }
 
 auth_field() { # auth_field <json> <key>
-  printf "%s" "$1" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const v=JSON.parse(s)[process.argv[1]];process.stdout.write(v==null?"":String(v))}catch{}})' "$2"
+  printf "%s" "$1" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{s=s.replace(/\x1b\[[0-9;?]*[A-Za-z]|\x1b[78]/g,"");const v=JSON.parse(s.slice(s.indexOf("{")))[process.argv[1]];process.stdout.write(v==null?"":String(v))}catch{}})' "$2"
 }
 
 setup_ai() {
@@ -118,17 +120,17 @@ setup_ai() {
   local bin
   if ! bin="$(find_claude)"; then
     warn "Claude Code isn't installed yet."
-    ask "Install it now? (official installer from claude.ai)" Y || { warn "Skipped. Run ./setup.sh --ai later."; return 0; }
+    ask "Install it now? (official installer from claude.ai)" Y || { warn "Skipped. Run $SETUP --ai later."; return 0; }
     curl -fsSL https://claude.ai/install.sh | bash || {
       warn "The installer didn't finish. Trying npm instead…"
       npm install -g @anthropic-ai/claude-code --no-audit --no-fund --loglevel=error || true
     }
-    bin="$(find_claude)" || die "Couldn't find Claude Code after installing. Open a new terminal and run ./setup.sh --ai."
+    bin="$(find_claude)" || die "Couldn't find Claude Code after installing. Open a new terminal and run $SETUP --ai"
   fi
-  ok "Claude Code found ($("$bin" --version 2>/dev/null | head -1))"
+  ok "Claude Code found ($("$bin" --version </dev/null 2>/dev/null | head -1))"
 
   local status logged method
-  status="$("$bin" auth status 2>/dev/null || true)"
+  status="$("$bin" auth status </dev/null 2>/dev/null || true)"
   logged="$(auth_field "$status" loggedIn)"
   method="$(auth_field "$status" authMethod)"
   if [ "$logged" = true ] && [ "$method" != "claude.ai" ]; then
@@ -138,11 +140,11 @@ setup_ai() {
   if [ "$logged" != true ]; then
     info "A browser window will open. Sign in with your ${B}@northeastern.edu${N} account"
     info "(choose ${B}Continue with SSO${N} if it asks), then come back here."
-    ask "Ready?" Y || { warn "Skipped. Run ./setup.sh --ai later."; return 0; }
+    ask "Ready?" Y || { warn "Skipped. Run $SETUP --ai later."; return 0; }
     "$bin" auth login --claudeai </dev/tty || warn "Sign-in didn't finish."
-    status="$("$bin" auth status 2>/dev/null || true)"
+    status="$("$bin" auth status </dev/null 2>/dev/null || true)"
     logged="$(auth_field "$status" loggedIn)"
-    [ "$logged" = true ] || die "Still not signed in. Run ./setup.sh --ai to try again."
+    [ "$logged" = true ] || die "Still not signed in. Run $SETUP --ai to try again."
   fi
   local who plan
   who="$(auth_field "$status" email)"; plan="$(auth_field "$status" subscriptionType)"
@@ -162,7 +164,7 @@ setup_ai() {
   else
     fail "Claude didn't answer the test."
     printf "%s\n" "$out" | grep '"type":"result"' | sed 's/^/    /' | head -3
-    info "Usage limits or a sign-in problem are the usual causes. See TROUBLESHOOTING.md, then run ./setup.sh --ai."
+    info "Usage limits or a sign-in problem are the usual causes. See docs/troubleshooting.md, then run $SETUP --ai"
     return 1
   fi
 }
@@ -200,7 +202,7 @@ setup_canvas() {
     read -rs token </dev/tty || token=""
     printf "\n"
     token="$(printf "%s" "$token" | tr -d '[:space:]')"
-    if [ -z "$token" ]; then rm -f "$err"; warn "Skipped. You can connect Canvas later on the Connect page, or run ./setup.sh --canvas."; return 0; fi
+    if [ -z "$token" ]; then rm -f "$err"; warn "Skipped. You can connect Canvas later on the Connect page, or run $SETUP --canvas"; return 0; fi
     if name="$(printf "%s\n%s\n" "$base" "$token" | helper check-canvas 2>"$err")"; then
       rm -f "$err"
       ok "Connected to Canvas as $name"
@@ -209,7 +211,7 @@ setup_canvas() {
     fail "$(cat "$err")"
   done
   rm -f "$err"
-  warn "Couldn't connect. Run ./setup.sh --canvas to try again."
+  warn "Couldn't connect. Run $SETUP --canvas to try again."
 }
 
 case "$ONLY" in
@@ -236,7 +238,7 @@ if [ "$OS" = Darwin ] && [ -d "$HOME/Desktop" ]; then
   if [ -e "$HOME/Desktop/Clutch.command" ]; then
     LAUNCHER=1
   elif ask "Put a Clutch icon on your Desktop to open it with a double-click?" Y; then
-    printf '#!/bin/sh\nexec "%s/start.sh"\n' "$PWD" >"$HOME/Desktop/Clutch.command"
+    printf '#!/bin/sh\nexec "%s/scripts/start.sh"\n' "$PWD" >"$HOME/Desktop/Clutch.command"
     chmod +x "$HOME/Desktop/Clutch.command"
     LAUNCHER=1
     ok "Added Clutch.command to your Desktop"
@@ -244,9 +246,9 @@ if [ "$OS" = Darwin ] && [ -d "$HOME/Desktop" ]; then
 fi
 
 printf "\n%s%sAll set.%s\n" "$B" "$G" "$N"
-info "Open Clutch any time with ${B}$PWD/start.sh${N}${LAUNCHER:+ or the Desktop icon}."
-info "Update later with ${B}./update.sh${N}."
+info "Open Clutch any time with ${LAUNCHER:+the ${B}Clutch${N} icon on your Desktop, or }${B}$PWD/scripts/start.sh${N}"
+info "Update later with ${B}$PWD/scripts/update.sh${N}"
 
 if [ "$START" = 1 ] && ask "Open Clutch now?" Y; then
-  exec ./start.sh
+  exec scripts/start.sh
 fi

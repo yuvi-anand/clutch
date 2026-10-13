@@ -167,7 +167,7 @@ export default function ConnectPage() {
             <p className="text-sm font-medium">Use the AI tool on this computer</p>
             <p className="mt-0.5 text-xs muted">
               Runs through an AI app you&apos;re already signed in to, like a school subscription, so there&apos;s no API key or cost.
-              Running <code>./setup.sh</code> in the {APP_NAME} folder signs you in and fills this in for you. You can also
+              Running <code>scripts/setup.sh</code> in the {APP_NAME} folder signs you in and fills this in for you. You can also
               paste a command here and click Save and test.
             </p>
             <textarea
@@ -176,7 +176,7 @@ export default function ConnectPage() {
               className="input mt-2 font-mono text-xs"
               value={command}
               onChange={(e) => setCommand(e.target.value)}
-              placeholder="Filled in by ./setup.sh"
+              placeholder="Filled in by scripts/setup.sh"
               spellCheck={false}
             />
             {status.engine === "command" && command === status.aiCommand && (

@@ -27,7 +27,7 @@ Clutch uses Claude to write your guides, quizzes and plans. It runs on your comp
 Open **Terminal** (press ⌘ Space, type *Terminal*, press Enter), paste this and press Enter:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yuvi-anand/clutch/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/yuvi-anand/clutch/main/scripts/install.sh | bash
 ```
 
 It downloads Clutch into a `Clutch` folder in your home folder and starts the guided setup.
@@ -36,7 +36,7 @@ It downloads Clutch into a `Clutch` folder in your home folder and starts the gu
 
 1. [Download the ZIP](https://github.com/yuvi-anand/clutch/archive/refs/heads/main.zip) and unzip it. Move the folder somewhere permanent, like your home folder.
 2. Open the folder and double-click **Install Clutch.command**.
-   If macOS says it's from an unidentified developer, right-click the file, choose **Open**, then **Open** again.
+   If macOS says it can't be opened or is from an unidentified developer, open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to "Install Clutch.command". (On older macOS, right-click the file and choose **Open**.)
 
 ### What setup does
 
@@ -49,13 +49,13 @@ Setup walks you through everything and asks before it installs anything:
 | **3. Canvas** | Opens your Canvas settings page and tells you where to click to make an access token. You paste it in, and setup checks it with Canvas. |
 | **4. Finish** | Builds the app, offers to put a **Clutch** icon on your Desktop, and opens Clutch in your browser. |
 
-You can skip the Canvas step and connect later on Clutch's **Connect** page. To redo a single step, run `./setup.sh --ai` or `./setup.sh --canvas` from the Clutch folder.
+You can skip the Canvas step and connect later on Clutch's **Connect** page. To redo a single step, run `scripts/setup.sh --ai` or `scripts/setup.sh --canvas` from the Clutch folder.
 
 > **Why a token for Canvas?** Northeastern's Canvas doesn't let outside apps sign in for you. A personal access token is Canvas's built-in way to give an app read access to your own account. You can delete it any time under Canvas → Account → Settings → Approved Integrations.
 
 ## Using Clutch
 
-- **Open it:** double-click **Clutch** on your Desktop, or run `~/Clutch/start.sh`. Your browser opens at <http://127.0.0.1:3100>.
+- **Open it:** double-click **Clutch** on your Desktop, or run `~/Clutch/scripts/start.sh`. Your browser opens at <http://127.0.0.1:3100>.
 - **Keep the Terminal window open** while you study. Closing it stops Clutch. Everything you made is saved.
 - **First time:** open a class, say what feels shaky ("dynamic programming, I don't get the recurrences"), and pick what to make (study guide, practice set, cheat sheet or quiz). A guide takes 30–90 seconds.
 
@@ -77,7 +77,7 @@ Clutch reads PDFs, PowerPoint (.pptx), Word (.docx), text and code files, Canvas
 
 ## Updating and uninstalling
 
-**Update:** run `~/Clutch/update.sh`, or paste the install command again. Your guides, notes and connections are kept.
+**Update:** run `~/Clutch/scripts/update.sh`, or paste the install command again. Your guides, notes and connections are kept.
 
 **Uninstall:** delete the `Clutch` folder and the Desktop icon. To revoke Canvas access too, delete the token in Canvas (Account → Settings → Approved Integrations). Setup may have installed Claude Code and Node.js; they're ordinary apps you can keep or remove.
 
@@ -89,7 +89,7 @@ Clutch reads PDFs, PowerPoint (.pptx), Word (.docx), text and code files, Canvas
 - **Locked-down AI calls.** Clutch runs Claude Code with tools, plugins, settings files and chat history all turned off, so it can only answer the prompt it's given. It can't touch your files.
 - **Your data** (guides, quizzes, plans, notes, feedback, cached course text) lives in the `data/` folder and is never committed to git.
 
-Found a security problem? See [SECURITY.md](SECURITY.md).
+Found a security problem? See the [security policy](.github/SECURITY.md).
 
 **Academic integrity.** Clutch is a study aid. It explains your course material and writes practice problems. It won't write answers for currently assigned homework, projects or CTF challenges. Follow your course's AI policy.
 
@@ -108,7 +108,7 @@ Through WSL: install [WSL with Ubuntu](https://learn.microsoft.com/windows/wsl/i
 Yes. During setup, enter your school's Canvas address. You'll need your own Claude subscription.
 
 **Something isn't working.**
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md), or [open an issue](https://github.com/yuvi-anand/clutch/issues/new/choose).
+See [docs/troubleshooting.md](docs/troubleshooting.md), or [open an issue](https://github.com/yuvi-anand/clutch/issues/new/choose).
 
 ## For developers
 
@@ -116,7 +116,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md), or [open an issue](https://github.
 git clone https://github.com/yuvi-anand/clutch.git
 cd clutch
 npm ci
-./setup.sh --ai        # or set things on the Connect page
+scripts/setup.sh --ai        # or set things on the Connect page
 npm run dev            # http://127.0.0.1:3100
 ```
 
@@ -133,9 +133,9 @@ A Next.js app whose API routes run on your machine:
 | `src/lib/materials.ts`, `src/lib/extract.ts` | Course materials to text (PDF, PPTX, DOCX, Canvas pages, websites), with page and slide markers |
 | `src/lib/prompts.ts` | Tutor, plan, quiz, margin-note and material-matching prompts |
 | `src/lib/ai.ts`, `src/lib/localEngine.ts` | Runs a generation through the local AI command, or through the API when a key is set |
-| `setup.sh`, `start.sh`, `update.sh`, `install.sh` | Guided setup, launcher, updater and one-line installer |
+| `scripts/` | Guided setup, launcher, updater and one-line installer |
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to send changes.
+See the [contributing guide](.github/CONTRIBUTING.md) for how to send changes.
 
 ## Roadmap
 
@@ -144,4 +144,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to send changes.
 - Gradescope, Piazza and Pawtograder
 - A hosted version that needs no install
 
-See [CHANGELOG.md](CHANGELOG.md) for what's new.
+See [the changelog](docs/changelog.md) for what's new.

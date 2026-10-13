@@ -2,9 +2,10 @@
 # Updates Clutch to the newest version. Your guides, notes and connections in data/ are kept.
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 REPO="yuvi-anand/clutch"
-REF="${CLUTCH_REF:-main}"
+# A download (not a git clone) remembers which branch it came from.
+REF="${CLUTCH_REF:-$(cat data/install-ref 2>/dev/null || echo main)}"
 
 if [ -d .git ]; then
   echo "Downloading the newest version…"
