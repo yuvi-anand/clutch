@@ -85,7 +85,7 @@ export default function ConnectPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Connect your accounts</h1>
-      <p className="mt-2 muted">{APP_NAME} needs read access to your Canvas, plus an API key for the AI that writes your guides. Both stay on this computer.</p>
+      <p className="mt-2 muted">{APP_NAME} needs read access to your Canvas, plus an AI to write your guides: your own subscription through the AI tool on this computer, or an API key. Everything stays on this computer.</p>
 
       <form onSubmit={save} className="mt-8 space-y-6">
         <section className="card p-6">
@@ -167,7 +167,8 @@ export default function ConnectPage() {
             <p className="text-sm font-medium">Use the AI tool on this computer</p>
             <p className="mt-0.5 text-xs muted">
               Runs through an AI app you&apos;re already signed in to, like a school subscription, so there&apos;s no API key or cost.
-              Paste the command from your setup guide, then click Save and test.
+              Running <code>./setup.sh</code> in the {APP_NAME} folder signs you in and fills this in for you. You can also
+              paste a command here and click Save and test.
             </p>
             <textarea
               id="ai-command"
@@ -175,7 +176,7 @@ export default function ConnectPage() {
               className="input mt-2 font-mono text-xs"
               value={command}
               onChange={(e) => setCommand(e.target.value)}
-              placeholder="Paste the command from your setup guide"
+              placeholder="Filled in by ./setup.sh"
               spellCheck={false}
             />
             {status.engine === "command" && command === status.aiCommand && (

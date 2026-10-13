@@ -1,0 +1,11 @@
+name: Idea or feedback
+description: Something that would make Clutch more useful for your classes
+labels: [feedback]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: What were you trying to do, and what got in the way?
+    validations:
+      required: true

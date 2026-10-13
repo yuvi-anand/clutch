@@ -1,0 +1,31 @@
+name: Something isn't working
+description: Setup failed, a page errored, or a guide came out wrong
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Please don't paste your Canvas token, grades or course files here. Check [TROUBLESHOOTING.md](https://github.com/yuvi-anand/clutch/blob/main/TROUBLESHOOTING.md) first."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you saw instead. Screenshots help (crop out personal info).
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where?
+      options: [Install / setup, Connect page, Dashboard, Catch-up plan, Study guide / practice / cheat sheet, Quiz, Margin notes, Other]
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Computer
+      placeholder: e.g. MacBook Air M2, macOS 15
+  - type: textarea
+    id: log
+    attributes:
+      label: Error text or data/build.log (optional)
+      render: text
