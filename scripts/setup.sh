@@ -9,7 +9,8 @@
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
-SETUP="$PWD/scripts/setup.sh"
+HERE="${PWD/#$HOME/~}"  # for messages: ~/Clutch instead of /Users/you/Clutch
+SETUP="$HERE/scripts/setup.sh"
 
 ONLY=""
 START=1
@@ -18,7 +19,7 @@ for arg in "$@"; do
     --ai) ONLY=ai ;;
     --canvas) ONLY=canvas ;;
     --no-start) START=0 ;;
-    -h|--help) sed -n '2,9p' "$SETUP" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,9p' "$PWD/scripts/setup.sh" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (try --help)"; exit 1 ;;
   esac
 done
@@ -246,8 +247,8 @@ if [ "$OS" = Darwin ] && [ -d "$HOME/Desktop" ]; then
 fi
 
 printf "\n%s%sAll set.%s\n" "$B" "$G" "$N"
-info "Open Clutch any time with ${LAUNCHER:+the ${B}Clutch${N} icon on your Desktop, or }${B}$PWD/scripts/start.sh${N}"
-info "Update later with ${B}$PWD/scripts/update.sh${N}"
+info "Open Clutch any time with ${LAUNCHER:+the ${B}Clutch${N} icon on your Desktop, or }${B}$HERE/scripts/start.sh${N}"
+info "Update later with ${B}$HERE/scripts/update.sh${N}"
 
 if [ "$START" = 1 ] && ask "Open Clutch now?" Y; then
   exec scripts/start.sh
