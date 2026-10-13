@@ -5,9 +5,12 @@
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DEST="${CLUTCH_DIR:-$HOME/Clutch}"
 
-# GitHub names the downloaded folder clutch-<branch>; remember the branch for updates.
+# Remember which branch this download came from, for updates: a release zip
+# says so in .install-ref, and GitHub's own zips are named clutch-<branch>.
 REF=""
-case "$(basename "$SRC")" in clutch-*) REF="${SRC##*/clutch-}" ;; esac
+if [ -f "$SRC/.install-ref" ]; then REF="$(cat "$SRC/.install-ref")"
+else case "$(basename "$SRC")" in clutch-*) REF="${SRC##*/clutch-}" ;; esac
+fi
 
 if [ "$SRC" != "$DEST" ]; then
   echo "Copying Clutch into $DEST…"

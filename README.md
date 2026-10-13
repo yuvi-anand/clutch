@@ -24,13 +24,13 @@ Clutch uses Claude to write your guides, quizzes and plans. It runs on your comp
 
 ### 1. Download
 
-**[⬇ Download Clutch](https://github.com/yuvi-anand/clutch/archive/refs/heads/main.zip)**
+**[⬇ Download Clutch](https://github.com/yuvi-anand/clutch/releases/download/v0.2.0-beta/Clutch.zip)**
 
-Open the downloaded file if your Mac didn't unzip it already. You'll get a folder called `clutch-main` in Downloads.
+Open the downloaded file if your Mac didn't unzip it already. You'll get a folder called `Clutch` in Downloads.
 
 ### 2. Double-click **Install Clutch.command**
 
-It's inside the `clutch-main` folder. The first time, your Mac blocks it because it didn't come from the App Store:
+It's inside that folder. The first time, your Mac blocks it because it didn't come from the App Store:
 
 1. Click **Done** on the warning.
 2. Open  → **System Settings** → **Privacy & Security**, scroll to the bottom, and click **Open Anyway** next to "Install Clutch.command". Enter your Mac password if it asks.
