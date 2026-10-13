@@ -219,3 +219,24 @@ Their question: ${question || DEFAULT_NOTE_QUESTION}
 
 Your answer appears as a small note in the margin beside the passage, so keep it short: 2 to 4 sentences, under 80 words. Start with the direct answer. For a term, say what it means in plain words and add one quick example; mention how it differs from a related term only if the student would likely mix them up. Be accurate to the course materials, and add one short citation like [file p.N] if it helps. No headings, no lists unless they are shorter than the sentences would be, and don't restate the question or the highlight.`;
 }
+
+/** Rewrite a saved guide the way the student asks, keeping its format rules. */
+export function refinePrompt(mode: Exclude<Mode, "quiz">, c: Ctx, guide: string, request: string): string {
+  return `You wrote this ${mode === "guide" ? "study guide" : mode === "practice" ? "practice set" : "cheat sheet"} for the student from the course materials above, following this brief:
+<original_brief>
+${modeInstructions(mode, c)}
+</original_brief>
+
+<current_version>
+${guide}
+</current_version>
+
+The student wants it changed:
+<request>
+${request}
+</request>
+
+Write the complete new version. Follow the request: it can redirect the focus, change the depth, tone or length, add or drop sections, or reframe the material for how they study. Where the request conflicts with the original brief, the request wins. Keep everything the request doesn't touch at the same quality, keep the course's notation and the source citations, and stay grounded in the course materials. If the request asks for answers to currently assigned graded work, teach the concepts instead, as your rules say.
+
+Reply with only the new Markdown, starting with a "# " title line. Don't mention the request, the previous version, or what you changed.`;
+}
