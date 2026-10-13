@@ -16,8 +16,8 @@ if [ "$SRC" != "$DEST" ]; then
   echo "Copying Clutch into $DEST…"
   mkdir -p "$DEST"
   rsync -a --delete --exclude data --exclude node_modules --exclude .next "$SRC"/ "$DEST"/ || { echo "Couldn't copy Clutch into $DEST."; exit 1; }
-  if [ -n "$REF" ]; then mkdir -p "$DEST/data" && printf "%s" "$REF" >"$DEST/data/install-ref"; fi
 fi
+if [ -n "$REF" ]; then mkdir -p "$DEST/data" && printf "%s" "$REF" >"$DEST/data/install-ref"; fi
 
 cd "$DEST" || exit 1
 chmod +x scripts/*.sh
