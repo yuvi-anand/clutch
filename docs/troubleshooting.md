@@ -15,8 +15,9 @@ scripts/setup.sh --canvas
 **"command not found: node" or "Node.js is too old"**
 Install the LTS version from [nodejs.org](https://nodejs.org), close Terminal, open a new window and run `scripts/setup.sh` again.
 
-**macOS says "Install Clutch.command" is from an unidentified developer**
-Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. On older macOS, right-click the file and choose **Open**. You only have to do this once.
+**macOS won't open "Install Clutch.command"**
+Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. On macOS 14 or older, right-click the file and choose **Open**. You only have to do this once.
+If there's no Open Anyway button: open Terminal, type `bash ` (with a space), drag **Install Clutch.command** into the window and press Enter.
 
 **"Permission denied" when running a script**
 Run `chmod +x ~/Clutch/scripts/*.sh`, then try again.

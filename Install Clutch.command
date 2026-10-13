@@ -1,6 +1,26 @@
-#!/bin/sh
-# Double-click this file in Finder to set up Clutch.
-cd "$(dirname "$0")" || exit 1
+#!/bin/bash
+# Double-click this file in Finder to install Clutch.
+# It copies Clutch into ~/Clutch (so the download can be deleted) and runs the guided setup.
+
+SRC="$(cd "$(dirname "$0")" && pwd)"
+DEST="${CLUTCH_DIR:-$HOME/Clutch}"
+
+# GitHub names the downloaded folder clutch-<branch>; remember the branch for updates.
+REF=""
+case "$(basename "$SRC")" in clutch-*) REF="${SRC##*/clutch-}" ;; esac
+
+if [ "$SRC" != "$DEST" ]; then
+  echo "Copying Clutch into $DEST…"
+  mkdir -p "$DEST"
+  rsync -a --delete --exclude data --exclude node_modules --exclude .next "$SRC"/ "$DEST"/ || { echo "Couldn't copy Clutch into $DEST."; exit 1; }
+  if [ -n "$REF" ]; then mkdir -p "$DEST/data" && printf "%s" "$REF" >"$DEST/data/install-ref"; fi
+fi
+
+cd "$DEST" || exit 1
 chmod +x scripts/*.sh
 scripts/setup.sh
+status=$?
+if [ "$SRC" != "$DEST" ] && [ $status -eq 0 ]; then
+  printf "\nClutch is installed in %s. You can delete the folder you downloaded.\n" "$DEST"
+fi
 printf "\nYou can close this window.\n"

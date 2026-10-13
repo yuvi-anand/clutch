@@ -20,23 +20,37 @@ Clutch uses Claude to write your guides, quizzes and plans. It runs on your comp
 
 ## Install
 
-**You need:** a Mac (or Linux, or Windows with WSL), your Northeastern Canvas login, and your Northeastern Claude account. Setup takes about 5 minutes.
+**You need:** a Mac, your Northeastern Canvas login and your Northeastern Claude account. It takes about 5 minutes.
 
-### Option 1: one command (recommended)
+### 1. Download
 
-Open **Terminal** (press ⌘ Space, type *Terminal*, press Enter), paste this and press Enter:
+**[⬇ Download Clutch](https://github.com/yuvi-anand/clutch/archive/refs/heads/main.zip)**
+
+Open the downloaded file if your Mac didn't unzip it already. You'll get a folder called `clutch-main` in Downloads.
+
+### 2. Double-click **Install Clutch.command**
+
+It's inside the `clutch-main` folder. The first time, your Mac blocks it because it didn't come from the App Store:
+
+1. Click **Done** on the warning.
+2. Open  → **System Settings** → **Privacy & Security**, scroll to the bottom, and click **Open Anyway** next to "Install Clutch.command". Enter your Mac password if it asks.
+3. Click **Open Anyway** once more. A Terminal window opens.
+
+<sub>On macOS 14 or older, right-click the file and choose **Open** instead.</sub>
+
+### 3. Follow the steps in the window
+
+Setup asks before it installs anything. When it's done, Clutch opens in your browser and there's a **Clutch** icon on your Desktop. You can delete the downloaded folder: Clutch now lives in a `Clutch` folder in your home folder.
+
+<details>
+<summary>Prefer Terminal? Install with one command</summary>
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yuvi-anand/clutch/main/scripts/install.sh | bash
 ```
 
-It downloads Clutch into a `Clutch` folder in your home folder and starts the guided setup.
-
-### Option 2: download and double-click
-
-1. [Download the ZIP](https://github.com/yuvi-anand/clutch/archive/refs/heads/main.zip) and unzip it. Move the folder somewhere permanent, like your home folder.
-2. Open the folder and double-click **Install Clutch.command**.
-   If macOS says it can't be opened or is from an unidentified developer, open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to "Install Clutch.command". (On older macOS, right-click the file and choose **Open**.)
+This works on Linux too, and on Windows inside [WSL](https://learn.microsoft.com/windows/wsl/install).
+</details>
 
 ### What setup does
 
