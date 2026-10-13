@@ -4,7 +4,7 @@
 
 Clutch connects to Canvas and shows what's due, what's missing and where your grades stand. It builds a day-by-day catch-up plan, and it writes study guides, practice sets, cheat sheets and quizzes from your own lecture slides, notes and worksheets.
 
-It runs on your computer and uses the Claude subscription you already have through Northeastern, so there's no API key and nothing to pay.
+Clutch uses Claude to write your guides, quizzes and plans. It runs on your computer through the Claude subscription you already have at Northeastern, so there's no API key and nothing to pay.
 
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey) ![node](https://img.shields.io/badge/node-%E2%89%A520.9-green) ![status](https://img.shields.io/badge/status-beta-orange)
 
