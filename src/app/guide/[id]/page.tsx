@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { InlineFeedback } from "@/components/Feedback";
 import { GuideBody } from "@/components/Markdown";
 import { NotedGuide } from "@/components/NotedGuide";
@@ -112,6 +112,10 @@ function GuideView({ id }: { id: string }) {
   const [guide, setGuide] = useState<SavedGuide | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [justRefined, setJustRefined] = useState<string | null>(null);
+  const draft = useStreamText();
 
   useEffect(() => {
     api<SavedGuide>(`/api/items/guide/${id}`)
@@ -157,6 +161,14 @@ function GuideView({ id }: { id: string }) {
         </span>
         <span>·</span>
         <span>{money(g.cost)}</span>
+        {(g.refinements?.length ?? 0) > 0 && (
+          <>
+            <span>·</span>
+            <span title={g.refinements!.map((r, i) => `${i + 1}. ${r}`).join("\n")}>
+              refined {g.refinements!.length}×
+            </span>
+          </>
+        )}
       </div>
       <div className="mt-4 flex flex-wrap gap-2 print:hidden">
         <button className="btn btn-primary btn-sm" onClick={() => next("quiz")}>
@@ -177,6 +189,9 @@ function GuideView({ id }: { id: string }) {
             Full study guide
           </button>
         )}
+        <button className={`btn btn-sm ${refineOpen ? "ring-2 ring-indigo-300 dark:ring-indigo-700" : ""}`} onClick={() => setRefineOpen((o) => !o)} aria-expanded={refineOpen}>
+          ✎ Refine
+        </button>
         <button className="btn btn-sm" onClick={copy}>
           {copied ? "Copied ✓" : "Copy Markdown"}
         </button>
@@ -189,8 +204,41 @@ function GuideView({ id }: { id: string }) {
           This stopped early because it hit the length limit. Pick fewer materials for a complete guide.
         </p>
       )}
+      {(refineOpen || refining) && (
+        <RefineBox
+          guide={g}
+          draft={draft}
+          onBusy={setRefining}
+          onClose={() => setRefineOpen(false)}
+          onDone={(updated, request) => {
+            setGuide(updated);
+            setRefineOpen(false);
+            setJustRefined(request);
+          }}
+        />
+      )}
+      {justRefined && !refining && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 print:hidden">
+          <span>
+            ✓ Rewritten: <span className="italic">“{justRefined.length > 90 ? justRefined.slice(0, 90) + "…" : justRefined}”</span>
+          </span>
+          <UndoButton guide={g} onUndone={(u) => { setGuide(u); setJustRefined(null); }} />
+          <button className="ml-auto text-xs opacity-70 hover:underline" onClick={() => setJustRefined(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="mt-6">
-        <NotedGuide guide={g} />
+        {refining && draft.text ? (
+          <div className="card p-6 sm:p-8">
+            <GuideBody markdown={draft.text} streaming />
+          </div>
+        ) : (
+          // Until the new version starts arriving, keep the current one on screen.
+          <div className={refining ? "pointer-events-none opacity-50 transition-opacity" : undefined}>
+            <NotedGuide guide={g} />
+          </div>
+        )}
       </div>
       <div className="mt-6 print:hidden">
         <p className="text-xs font-semibold tracking-wide uppercase muted">Built from</p>
@@ -206,5 +254,182 @@ function GuideView({ id }: { id: string }) {
       </div>
       <InlineFeedback kind="guide" refId={g.id} question="Did this help you catch up?" />
     </article>
+  );
+}
+
+const REFINE_IDEAS = [
+  "Explain it more simply, like I missed the lectures",
+  "Add more worked examples",
+  "Shorter: just what I need for the exam",
+  "Focus on what's most likely to be tested",
+  "Add more practice problems",
+  "Go deeper on why things work",
+];
+
+type Draft = ReturnType<typeof useStreamText>;
+
+/** The prompt window: say how to change the guide, and watch the new version stream in. */
+function RefineBox({
+  guide,
+  draft,
+  onBusy,
+  onClose,
+  onDone,
+}: {
+  guide: SavedGuide;
+  draft: Draft;
+  onBusy: (busy: boolean) => void;
+  onClose: () => void;
+  onDone: (updated: SavedGuide, request: string) => void;
+}) {
+  const [request, setRequest] = useState("");
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abort = useRef<AbortController | null>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => box.current?.focus(), []);
+  useEffect(() => () => abort.current?.abort(), []);
+
+  function addIdea(idea: string) {
+    setRequest((r) => (r.trim() ? `${r.trim().replace(/[.,;]$/, "")}. ${idea}` : idea));
+    box.current?.focus();
+  }
+
+  async function run() {
+    const ask = request.trim();
+    if (ask.length < 3 || busy) return;
+    const ac = new AbortController();
+    abort.current = ac;
+    setBusy(true);
+    onBusy(true);
+    setError(null);
+    setStatus("Reading your course materials…");
+    draft.reset();
+    let doneOk = false;
+    try {
+      await streamEvents(
+        `/api/items/guide/${guide.id}/refine`,
+        { action: "refine", request: ask },
+        (ev) => {
+          if (ev.t === "status") setStatus(ev.text);
+          else if (ev.t === "text") draft.append(ev.text);
+          else if (ev.t === "error") setError(ev.message);
+          else if (ev.t === "done") doneOk = true;
+        },
+        ac.signal,
+      );
+      if (doneOk) {
+        const updated = await api<SavedGuide>(`/api/items/guide/${guide.id}`);
+        draft.reset();
+        onDone(updated, ask);
+        setRequest("");
+      }
+    } catch (e) {
+      if (!ac.signal.aborted) setError((e as Error).message);
+    } finally {
+      draft.flush();
+      setBusy(false);
+      onBusy(false);
+    }
+  }
+
+  function stop() {
+    abort.current?.abort();
+    draft.reset();
+    setStatus("");
+  }
+
+  return (
+    <section className="card mt-4 p-4 sm:p-5 print:hidden" aria-label="Refine this guide">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Refine this {guide.type === "practice" ? "practice set" : guide.type === "cheatsheet" ? "cheat sheet" : "guide"}</h2>
+          <p className="mt-0.5 text-xs muted">
+            Say what to change: what to focus on, how deep to go, or how to explain it. It&apos;s rewritten from the same course materials, and you can undo.
+          </p>
+        </div>
+        {!busy && (
+          <button className="text-sm muted hover:underline" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        )}
+      </div>
+      <textarea
+        ref={box}
+        rows={3}
+        className="input mt-3 text-sm"
+        value={request}
+        disabled={busy}
+        onChange={(e) => setRequest(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            run();
+          }
+        }}
+        placeholder="e.g. I get the definitions but not how to set up the recurrence. Walk through 3 more examples step by step and skip the history."
+        maxLength={3000}
+      />
+      {!busy && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {REFINE_IDEAS.map((idea) => (
+            <button key={idea} type="button" className="chip hover:bg-stone-200 dark:hover:bg-stone-700" onClick={() => addIdea(idea)}>
+              + {idea}
+            </button>
+          ))}
+        </div>
+      )}
+      {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {busy ? (
+          <>
+            <span className="flex items-center gap-2 text-sm muted">
+              <Spinner /> {draft.text ? "Writing the new version…" : status === "Rewriting…" ? "Planning the changes… A long guide takes 2–3 minutes." : status || "Starting…"}
+            </span>
+            <button className="btn btn-sm" onClick={stop}>
+              Stop
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-primary btn-sm" onClick={run} disabled={request.trim().length < 3}>
+              Rewrite it
+            </button>
+            <span className="text-xs muted">⌘↵ also works</span>
+            {(guide.history?.length ?? 0) > 0 && <UndoButton guide={guide} onUndone={(u) => onDone(u, "")} label="Undo the last change" />}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function UndoButton({ guide, onUndone, label = "Undo" }: { guide: SavedGuide; onUndone: (g: SavedGuide) => void; label?: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!guide.history?.length) return null;
+  return (
+    <>
+      <button
+        className="text-sm font-medium underline-offset-2 hover:underline disabled:opacity-50"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            onUndone(await api<SavedGuide>(`/api/items/guide/${guide.id}/refine`, { action: "undo" }));
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Undoing…" : label}
+      </button>
+      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+    </>
   );
 }

@@ -222,7 +222,19 @@ export type GuideType = "guide" | "practice" | "cheatsheet";
 /** A margin note: a question about a highlighted passage, and its answer. */
 export type GuideNote = { id: string; quote: string; occurrence?: number; question: string; answer: string; createdAt: string };
 
-export type SavedGuide = SavedBase & { type: GuideType; markdown: string; truncated?: boolean; notes?: GuideNote[] };
+/** An earlier version of a guide, kept so a refinement can be undone. */
+export type GuideVersion = { title: string; markdown: string; truncated?: boolean; savedAt: string };
+
+export type SavedGuide = SavedBase & {
+  type: GuideType;
+  markdown: string;
+  truncated?: boolean;
+  notes?: GuideNote[];
+  /** What the student asked for in each refinement, oldest first. */
+  refinements?: string[];
+  /** Earlier versions, oldest first. */
+  history?: GuideVersion[];
+};
 
 export type QuizQuestion = {
   type: "mcq" | "short";
