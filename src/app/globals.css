@@ -66,6 +66,13 @@ details > summary::-webkit-details-marker {
 .katex[data-noted] .katex-html > .base {
   background-color: rgb(250 204 21 / 0.35);
 }
+/* The passage of the note in focus. */
+::highlight(clutch-notes-active) {
+  background-color: rgb(250 204 21 / 0.65);
+}
+.katex[data-noted="active"] .katex-html > .base {
+  background-color: rgb(250 204 21 / 0.65);
+}
 .katex[data-noted] .katex-html > .base:first-child {
   border-top-left-radius: 3px;
   border-bottom-left-radius: 3px;

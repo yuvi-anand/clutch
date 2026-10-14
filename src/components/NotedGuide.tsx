@@ -149,6 +149,12 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const noteRefs = useRef(new Map<string, HTMLDivElement>());
+  const listRefs = useRef(new Map<string, HTMLDivElement>());
+  // Where each note's passage is on the page, for clicking a highlight to open its note.
+  const rangesRef = useRef(new Map<string, Range>());
+  const [active, setActive] = useState<string | null>(null);
+  // After focusing a note, scroll to the note (clicked its highlight) or to the passage (clicked the note).
+  const scrollTo = useRef<{ key: string; to: "note" | "passage" } | null>(null);
   const [notes, setNotes] = useState<GuideNote[]>(guide.notes ?? []);
   const [pending, setPending] = useState<Pending | null>(null);
   const [ask, setAsk] = useState<Ask | null>(null);
@@ -177,7 +183,7 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
       ...(pending ? [{ key: "pending", quote: pending.quote, occurrence: pending.occurrence, anchor: 2 as const }] : []),
     ];
     const base = body.getBoundingClientRect().top;
-    const ranges: Range[] = [];
+    const ranges = new Map<string, Range>();
     const wanted: { key: string; top: number }[] = [];
     const lost: string[] = [];
     const quotes: Record<string, string> = {};
@@ -187,7 +193,7 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
         lost.push(n.key);
         continue;
       }
-      ranges.push(found.range);
+      ranges.set(n.key, found.range);
       quotes[n.key] = found.quote;
       wanted.push({ key: n.key, top: found.range.getBoundingClientRect().top - base });
     }
@@ -199,6 +205,10 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
       next[w.key] = top;
       floor = top + (noteRefs.current.get(w.key)?.offsetHeight ?? 120) + 12;
     }
+    // The focused note comes up level with its passage, on top of the others (which stay put).
+    const focused = active ? wanted.find((w) => w.key === active) : undefined;
+    if (focused) next[focused.key] = focused.top;
+    rangesRef.current = ranges;
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     setTops((prev) => (same(prev, next) ? prev : next));
     setMissing((prev) => (same(prev, lost) ? prev : lost));
@@ -206,18 +216,90 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
     const reg = highlights();
     const Ctor = HighlightCtor();
     // Text gets the highlight; each formula gets one rounded mark instead of a box per symbol.
+    // The focused note's passage is highlighted more strongly.
     body.querySelectorAll("[data-noted]").forEach((el) => el.removeAttribute("data-noted"));
     const textRanges: Range[] = [];
-    for (const r of ranges) {
+    const activeRanges: Range[] = [];
+    for (const [key, r] of ranges) {
+      const on = key === active;
       body.querySelectorAll(".katex").forEach((el) => {
-        if (r.intersectsNode(el)) el.setAttribute("data-noted", "");
+        if (r.intersectsNode(el) && el.getAttribute("data-noted") !== "active") el.setAttribute("data-noted", on ? "active" : "");
       });
-      textRanges.push(...textOnly(r));
+      (on ? activeRanges : textRanges).push(...textOnly(r));
     }
-    if (reg && Ctor) reg.set("clutch-notes", new Ctor(...textRanges));
-  }, [notes, pending, layoutTick]);
+    if (reg && Ctor) {
+      reg.set("clutch-notes", new Ctor(...textRanges));
+      reg.set("clutch-notes-active", new Ctor(...activeRanges));
+    }
+  }, [notes, pending, layoutTick, active]);
 
-  useEffect(() => () => highlights()?.delete("clutch-notes"), []);
+  useEffect(
+    () => () => {
+      highlights()?.delete("clutch-notes");
+      highlights()?.delete("clutch-notes-active");
+    },
+    [],
+  );
+
+  /** The note whose highlighted passage is under this point, if any. */
+  const noteAt = useCallback((x: number, y: number, target: Element | null): string | null => {
+    const formula = target?.closest(".katex");
+    for (const [key, r] of rangesRef.current) {
+      if (formula && r.intersectsNode(formula)) return key;
+      for (const rect of r.getClientRects()) {
+        if (x >= rect.left - 1 && x <= rect.right + 1 && y >= rect.top - 1 && y <= rect.bottom + 1) return key;
+      }
+    }
+    return null;
+  }, []);
+
+  // Clicking a highlight brings its note into focus; clicking anywhere else in the guide lets go.
+  const onBodyClick = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as Element;
+      if (target.closest("a,button,summary,input,textarea")) return;
+      if (!(window.getSelection()?.isCollapsed ?? true)) return; // they're selecting text to ask about
+      const key = noteAt(e.clientX, e.clientY, target);
+      setActive(key);
+      scrollTo.current = key ? { key, to: "note" } : null;
+    },
+    [noteAt],
+  );
+
+  // Runs once the focused note has moved into place.
+  useEffect(() => {
+    const want = scrollTo.current;
+    if (!want || want.key !== active) return;
+    scrollTo.current = null;
+    // Wide screens show the note beside the passage; narrow ones list notes below the guide.
+    const wide = window.matchMedia("(min-width: 1024px)").matches;
+    if (want.to === "note") {
+      (wide ? noteRefs : listRefs).current.get(want.key)?.scrollIntoView({ behavior: "smooth", block: wide ? "nearest" : "center" });
+    } else {
+      const rect = rangesRef.current.get(want.key)?.getBoundingClientRect();
+      if (rect && (rect.top < 80 || rect.bottom > window.innerHeight - 40)) {
+        window.scrollBy({ top: rect.top - window.innerHeight / 3, behavior: "smooth" });
+      }
+    }
+  }, [active, tops]);
+
+  // A pointer over a highlight shows it can be clicked.
+  const onBodyMove = useCallback(
+    (e: React.MouseEvent) => {
+      const body = bodyRef.current;
+      if (!body || !rangesRef.current.size) return;
+      const hit = noteAt(e.clientX, e.clientY, e.target as Element) !== null;
+      body.style.cursor = hit ? "pointer" : "";
+    },
+    [noteAt],
+  );
+
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setActive(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active]);
 
   const onMouseUp = useCallback((e: MouseEvent) => {
     if ((e.target as Element | null)?.closest?.("[data-ask-box]")) return;
@@ -286,6 +368,7 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
   }
 
   async function remove(id: string) {
+    if (active === id) setActive(null);
     const r = await api<{ notes: GuideNote[] }>(`/api/items/guide/${guide.id}/notes`, { action: "delete", noteId: id }).catch(() => null);
     if (r) setNotes(r.notes);
   }
@@ -300,10 +383,19 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
     <div
       key={c.key}
       ref={(el) => {
-        if (placed && el) noteRefs.current.set(c.key, el);
+        if (el) (placed ? noteRefs : listRefs).current.set(c.key, el);
       }}
       style={placed ? { top: tops[c.key] ?? 0 } : undefined}
-      className={`${placed ? "absolute inset-x-0 transition-[top] duration-200" : ""} rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40`}
+      onClick={(e) => {
+        if ((e.target as Element).closest("button") || missing.includes(c.key) || c.key === "pending") return;
+        setActive(c.key);
+        scrollTo.current = { key: c.key, to: "passage" };
+      }}
+      className={`${placed ? "absolute inset-x-0 transition-[top,box-shadow] duration-200" : "transition-shadow"} rounded-lg border p-3 text-sm ${
+        active === c.key
+          ? "z-10 border-amber-400 bg-amber-50 shadow-lg ring-2 ring-amber-400 dark:border-amber-500 dark:bg-stone-900 dark:ring-amber-500"
+          : "border-amber-200 bg-amber-50 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40"
+      }`}
     >
       <div className="flex items-start gap-2">
         <p className="line-clamp-2 min-w-0 flex-1 border-l-2 border-amber-400 pl-2 text-xs italic muted">“{shown[c.key] ?? c.quote}”</p>
@@ -337,7 +429,7 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
       )}
       <p className="mt-2 text-xs font-semibold">{c.question}</p>
       {c.answer ? (
-        <div className={placed ? "mt-1 max-h-56 overflow-y-auto pr-1" : "mt-1"}>
+        <div className={placed && active !== c.key ? "mt-1 max-h-56 overflow-y-auto pr-1" : "mt-1"}>
           <Markdown className="prose-sm">{c.answer}</Markdown>
         </div>
       ) : (
@@ -360,9 +452,9 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
 
   return (
     <div ref={rootRef} className="relative">
-      <p className="mb-2 text-xs muted print:hidden">Highlight any passage to ask about it. Answers stay as notes beside it.</p>
+      <p className="mb-2 text-xs muted print:hidden">Highlight any passage to ask about it. Answers stay as notes beside it. Click a highlight to bring up its note.</p>
       <div className="relative">
-        <div ref={bodyRef} className="card p-6 sm:p-8 print:border-0 print:p-0 print:shadow-none">
+        <div ref={bodyRef} onClick={onBodyClick} onMouseMove={onBodyMove} className="card p-6 sm:p-8 print:border-0 print:p-0 print:shadow-none">
           <GuideBody markdown={guide.markdown} />
         </div>
         {/* Wide screens: notes float in the right margin, level with their passage. */}
