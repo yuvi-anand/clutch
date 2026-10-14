@@ -56,7 +56,7 @@ export async function POST(req: Request, ctx: Ctx) {
       signal,
       onText: (text) => send({ t: "text", text }),
     });
-    const note = { id: newId(), quote: b.quote, occurrence: b.occurrence, question: b.question || DEFAULT_NOTE_QUESTION, answer: result.text.trim(), createdAt: new Date().toISOString() };
+    const note = { id: newId(), quote: b.quote, occurrence: b.occurrence, anchor: 2 as const, question: b.question || DEFAULT_NOTE_QUESTION, answer: result.text.trim(), createdAt: new Date().toISOString() };
     const fresh = loadItem("guide", id) ?? guide;
     saveItem("guide", { ...fresh, notes: [...(fresh.notes ?? []), note] });
     send({ t: "done", id: note.id, cost: result.cost });

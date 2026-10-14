@@ -13,14 +13,26 @@ import { DEFAULT_NOTE_QUESTION, type GuideNote, type SavedGuide } from "@/lib/ty
 type Pending = { quote: string; occurrence: number; question: string; answer: string; error?: string };
 type Ask = { quote: string; occurrence: number; x: number; y: number; open: boolean };
 
+// Each formula is in the page twice: a hidden MathML copy for screen readers
+// and the visible one. Notes only ever look at visible text.
+const isHidden = (n: Node) => Boolean(n.parentElement?.closest(".katex-mathml"));
+
+function visibleText(root: Node): Text[] {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (isHidden(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
+  const out: Text[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) out.push(n as Text);
+  return out;
+}
+
 /** Every place the quote appears in the rendered guide, ignoring whitespace (selections span blocks and inline tags). */
-function findRanges(root: HTMLElement, quote: string): Range[] {
+function findRanges(root: HTMLElement, quote: string, nodes = visibleText(root)): Range[] {
   const target = quote.replace(/\s+/g, "");
   if (!target) return [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let flat = "";
   const map: [Text, number][] = [];
-  for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+  for (const n of nodes) {
     for (let i = 0; i < n.data.length; i++) {
       if (/\s/.test(n.data[i])) continue;
       flat += n.data[i];
@@ -39,12 +51,80 @@ function findRanges(root: HTMLElement, quote: string): Range[] {
   return out;
 }
 
+const BLOCK = "p,li,h1,h2,h3,h4,h5,h6,td,th,pre,blockquote,.katex-display";
+
+/** The visible text of a selection: formulas once, as shown, with a space between blocks. */
+function selectionText(range: Range, root: HTMLElement): string {
+  let out = "";
+  let lastBlock: Element | null = null;
+  for (const n of visibleText(root)) {
+    if (!range.intersectsNode(n)) continue;
+    const start = n === range.startContainer ? range.startOffset : 0;
+    const end = n === range.endContainer ? range.endOffset : n.data.length;
+    const piece = n.data.slice(start, end);
+    if (!piece) continue;
+    const block = n.parentElement?.closest(BLOCK) ?? null;
+    if (out && block !== lastBlock && !/\s$/.test(out)) out += " ";
+    out += piece;
+    lastBlock = block;
+  }
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Notes saved before formulas were read once have their quote polluted by the
+ * hidden copy, e.g. "𝑓\n=\n𝑜\n(\n𝑔\n)\nf=o(g)". Drop those one-symbol lines
+ * and fold the math letters back to plain ones.
+ */
+function repairQuote(quote: string): string {
+  const out: string[] = [];
+  let run: string[] = [];
+  const endRun = () => {
+    if (run.length === 1) out.push(run[0]);
+    run = [];
+  };
+  for (const line of quote.split("\n")) {
+    const t = line.trim();
+    if (t && t.length <= 4 && !/\s/.test(t)) run.push(t);
+    else {
+      endRun();
+      out.push(line);
+    }
+  }
+  endRun();
+  return out.join(" ").normalize("NFKC").replace(/\s+/g, " ").trim();
+}
+
+/** Find a note's passage. Returns the range and the quote as it reads on the page. */
+function locate(root: HTMLElement, note: { quote: string; occurrence?: number; anchor?: 2 }): { range: Range; quote: string } | null {
+  const nodes = visibleText(root);
+  for (const quote of note.anchor === 2 ? [note.quote] : [note.quote, repairQuote(note.quote)]) {
+    const all = findRanges(root, quote, nodes);
+    if (!all.length) continue;
+    let i = note.occurrence ?? 0;
+    if (note.anchor !== 2 && i > 0) {
+      // Older notes counted hidden copies too: find that spot, then the visible copy at or after it.
+      const old = findRangesAll(root, note.quote)[i];
+      i = old ? Math.max(0, all.findIndex((r) => r.compareBoundaryPoints(Range.START_TO_START, old) >= 0)) : 0;
+    }
+    return { range: all[i] ?? all[0], quote };
+  }
+  return null;
+}
+
+/** The old way of matching, over every text node (hidden formula copies included). Only for placing older notes. */
+function findRangesAll(root: HTMLElement, quote: string): Range[] {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
+  return findRanges(root, quote, nodes);
+}
+
 /** The parts of a range that are ordinary text, leaving out formulas. */
 function textOnly(range: Range): Range[] {
   const rootNode = range.commonAncestorContainer;
-  const walker = document.createTreeWalker(rootNode.nodeType === Node.TEXT_NODE ? rootNode.parentNode! : rootNode, NodeFilter.SHOW_TEXT);
   const out: Range[] = [];
-  for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+  for (const n of visibleText(rootNode.nodeType === Node.TEXT_NODE ? rootNode.parentNode! : rootNode)) {
     if (!range.intersectsNode(n) || n.parentElement?.closest(".katex")) continue;
     const part = document.createRange();
     part.setStart(n, n === range.startContainer ? range.startOffset : 0);
@@ -52,11 +132,6 @@ function textOnly(range: Range): Range[] {
     if (!part.collapsed) out.push(part);
   }
   return out;
-}
-
-function findRange(root: HTMLElement, quote: string, occurrence = 0): Range | null {
-  const all = findRanges(root, quote);
-  return all[occurrence] ?? all[0] ?? null;
 }
 
 /** Which copy of the quote the selection is on (0 when it appears once). */
@@ -81,6 +156,9 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
   const [tops, setTops] = useState<Record<string, number>>({});
   const [layoutTick, setLayoutTick] = useState(0);
   const [confirming, setConfirming] = useState<string | null>(null);
+  // Notes whose passage isn't in the guide (it was rewritten), and quotes as they read on the page.
+  const [missing, setMissing] = useState<string[]>([]);
+  const [shown, setShown] = useState<Record<string, string>>({});
 
   // Re-place notes when the guide's layout changes (answer key opened, window resized).
   useEffect(() => {
@@ -95,25 +173,36 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
     const body = bodyRef.current;
     if (!body) return;
     const all = [
-      ...notes.map((n) => ({ key: n.id, quote: n.quote, occurrence: n.occurrence ?? 0 })),
-      ...(pending ? [{ key: "pending", quote: pending.quote, occurrence: pending.occurrence }] : []),
+      ...notes.map((n) => ({ key: n.id, quote: n.quote, occurrence: n.occurrence ?? 0, anchor: n.anchor })),
+      ...(pending ? [{ key: "pending", quote: pending.quote, occurrence: pending.occurrence, anchor: 2 as const }] : []),
     ];
     const base = body.getBoundingClientRect().top;
     const ranges: Range[] = [];
-    const wanted = all.map((n, i) => {
-      const r = findRange(body, n.quote, n.occurrence);
-      if (r) ranges.push(r);
-      return { key: n.key, top: r ? r.getBoundingClientRect().top - base : Number.MAX_SAFE_INTEGER - all.length + i };
-    });
+    const wanted: { key: string; top: number }[] = [];
+    const lost: string[] = [];
+    const quotes: Record<string, string> = {};
+    for (const n of all) {
+      const found = locate(body, n);
+      if (!found) {
+        lost.push(n.key);
+        continue;
+      }
+      ranges.push(found.range);
+      quotes[n.key] = found.quote;
+      wanted.push({ key: n.key, top: found.range.getBoundingClientRect().top - base });
+    }
     // Stack notes downward so they never overlap.
     let floor = 0;
     const next: Record<string, number> = {};
-    for (const w of [...wanted].sort((a, b) => a.top - b.top)) {
-      const top = Math.max(w.top >= Number.MAX_SAFE_INTEGER - all.length ? floor : w.top, floor);
+    for (const w of wanted.sort((a, b) => a.top - b.top)) {
+      const top = Math.max(w.top, floor);
       next[w.key] = top;
       floor = top + (noteRefs.current.get(w.key)?.offsetHeight ?? 120) + 12;
     }
-    setTops((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    setTops((prev) => (same(prev, next) ? prev : next));
+    setMissing((prev) => (same(prev, lost) ? prev : lost));
+    setShown((prev) => (same(prev, quotes) ? prev : quotes));
     const reg = highlights();
     const Ctor = HighlightCtor();
     // Text gets the highlight; each formula gets one rounded mark instead of a box per symbol.
@@ -134,9 +223,9 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
     if ((e.target as Element | null)?.closest?.("[data-ask-box]")) return;
     setTimeout(() => {
       const sel = window.getSelection();
-      const text = sel?.toString().trim() ?? "";
       const body = bodyRef.current;
       const inside = Boolean(body && sel && sel.rangeCount > 0 && body.contains(sel.getRangeAt(0).commonAncestorContainer));
+      const text = inside ? selectionText(sel!.getRangeAt(0), body!) : "";
       if (!sel || !inside || text.length < 3) {
         setAsk((a) => (a?.open ? a : null));
         return;
@@ -205,6 +294,8 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
     ...notes.map((n) => ({ key: n.id, quote: n.quote, question: n.question, answer: n.answer, error: undefined as string | undefined, live: false })),
     ...(pending ? [{ key: "pending", ...pending, live: !pending.error }] : []),
   ];
+  const placed = cards.filter((c) => !missing.includes(c.key));
+  const lost = cards.filter((c) => missing.includes(c.key));
   const card = (c: (typeof cards)[number], placed: boolean) => (
     <div
       key={c.key}
@@ -215,7 +306,7 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
       className={`${placed ? "absolute inset-x-0 transition-[top] duration-200" : ""} rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40`}
     >
       <div className="flex items-start gap-2">
-        <p className="line-clamp-2 min-w-0 flex-1 border-l-2 border-amber-400 pl-2 text-xs italic muted">“{c.quote}”</p>
+        <p className="line-clamp-2 min-w-0 flex-1 border-l-2 border-amber-400 pl-2 text-xs italic muted">“{shown[c.key] ?? c.quote}”</p>
         {c.key !== "pending" && (
           <button
             onClick={() => setConfirming(c.key)}
@@ -275,10 +366,22 @@ export function NotedGuide({ guide }: { guide: SavedGuide }) {
           <GuideBody markdown={guide.markdown} />
         </div>
         {/* Wide screens: notes float in the right margin, level with their passage. */}
-        <div className="absolute top-0 left-full ml-4 hidden w-64 lg:block xl:ml-6 xl:w-72 print:hidden">{cards.map((c) => card(c, true))}</div>
+        <div className="absolute top-0 left-full ml-4 hidden w-64 lg:block xl:ml-6 xl:w-72 print:hidden">{placed.map((c) => card(c, true))}</div>
       </div>
       {/* Narrow screens: notes stack below the guide. */}
-      {cards.length > 0 && <div className="mt-6 space-y-3 lg:hidden print:hidden">{cards.map((c) => card(c, false))}</div>}
+      {placed.length > 0 && <div className="mt-6 space-y-3 lg:hidden print:hidden">{placed.map((c) => card(c, false))}</div>}
+      {lost.length > 0 && (
+        <section className="mt-6 print:hidden">
+          <p className="text-xs font-semibold tracking-wide uppercase muted">Notes on text that changed</p>
+          <p className="mt-1 text-xs muted">
+            {(guide.refinements?.length ?? 0) > 0
+              ? "These passages were reworded when the guide was refined, so the notes can't sit beside them anymore."
+              : "These passages couldn't be found in the guide anymore."}{" "}
+            Keep them for reference, or delete them.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">{lost.map((c) => card(c, false))}</div>
+        </section>
+      )}
 
       {ask && (
         <div data-ask-box className="absolute z-40 -translate-x-1/2 print:hidden" style={{ left: ask.x, top: ask.y }} onMouseDown={(e) => e.stopPropagation()}>

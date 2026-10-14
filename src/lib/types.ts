@@ -220,7 +220,16 @@ export type SavedBase = {
 export type GuideType = "guide" | "practice" | "cheatsheet";
 
 /** A margin note: a question about a highlighted passage, and its answer. */
-export type GuideNote = { id: string; quote: string; occurrence?: number; question: string; answer: string; createdAt: string };
+export type GuideNote = {
+  id: string;
+  quote: string;
+  occurrence?: number;
+  /** 2 = quote and occurrence count only the visible text (formulas once). Older notes also counted formulas' hidden copies. */
+  anchor?: 2;
+  question: string;
+  answer: string;
+  createdAt: string;
+};
 
 /** An earlier version of a guide, kept so a refinement can be undone. */
 export type GuideVersion = { title: string; markdown: string; truncated?: boolean; savedAt: string };

@@ -62,8 +62,15 @@ details > summary::-webkit-details-marker {
 ::highlight(clutch-notes) {
   background-color: rgb(250 204 21 / 0.35);
 }
-.katex[data-noted] {
-  background-color: rgb(250 204 21 / 0.2);
-  border-radius: 6px;
-  box-shadow: 0 0 0 4px rgb(250 204 21 / 0.2);
+/* A noted formula gets the same highlighter as text, one tight box per line. */
+.katex[data-noted] .katex-html > .base {
+  background-color: rgb(250 204 21 / 0.35);
+}
+.katex[data-noted] .katex-html > .base:first-child {
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+.katex[data-noted] .katex-html > .base:last-child {
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
 }
