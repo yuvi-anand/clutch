@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DATA_DIR } from "./config";
-import type { LibraryEntry, SavedGuide, SavedPlan, SavedQuiz } from "./types";
+import type { ClassQA, LibraryEntry, SavedGuide, SavedPlan, SavedQuiz } from "./types";
 
 // Everything the student makes is saved as JSON under data/ (plus a .md copy
 // of each guide, so it can be opened in any editor).
@@ -83,4 +83,23 @@ export function latestPlan(): SavedPlan | null {
 export function appendFeedback(entry: Record<string, unknown>) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.appendFileSync(path.join(DATA_DIR, "feedback.jsonl"), JSON.stringify(entry) + "\n");
+}
+
+// Questions asked about a class, one file per class, oldest first.
+const qaFile = (courseId: number) => {
+  const d = path.join(/*turbopackIgnore: true*/ DATA_DIR, "class-questions");
+  fs.mkdirSync(d, { recursive: true });
+  return path.join(d, `${courseId}.json`);
+};
+
+export function classQuestions(courseId: number): ClassQA[] {
+  try {
+    return JSON.parse(fs.readFileSync(qaFile(courseId), "utf8")) as ClassQA[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveClassQuestions(courseId: number, list: ClassQA[]) {
+  fs.writeFileSync(qaFile(courseId), JSON.stringify(list.slice(-50), null, 2));
 }

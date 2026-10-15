@@ -288,3 +288,6 @@ export const MODE_LABELS: Record<Mode, string> = {
   cheatsheet: "Cheat sheet",
   quiz: "Quiz",
 };
+
+/** A question the student asked about how a class works, and the answer. */
+export type ClassQA = { id: string; question: string; answer: string; sources: string[]; createdAt: string };

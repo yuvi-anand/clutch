@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
 import { CourseExtras } from "@/components/CourseExtras";
+import { ClassQuestions } from "@/components/ClassQuestions";
 import { ErrorBox, PageLoading, ScorePill, Spinner } from "@/components/ui";
 import { APP_NAME } from "@/lib/brand";
 import { api, dayKeyOf, fmtDay, fmtTime, setPending } from "@/lib/client";
@@ -163,6 +164,10 @@ function CourseScreen({ courseId }: { courseId: number }) {
           <ErrorBox message={error} />
         </div>
       )}
+
+      <div className="mt-6">
+        <ClassQuestions courseId={courseId} manual={Boolean(course.manual)} />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="order-2 lg:order-1">

@@ -25,6 +25,7 @@ export type CanvasCourse = {
   term?: CanvasTerm;
   enrollments?: { type: string; computed_current_score?: number | null }[];
   syllabus_body?: string | null;
+  apply_assignment_group_weights?: boolean;
 };
 export type CanvasSubmission = {
   workflow_state: string;
@@ -54,6 +55,14 @@ export type CanvasModuleItem = {
   html_url?: string;
   content_details?: { locked_for_user?: boolean; display_name?: string };
 };
+export type CanvasAssignmentGroup = {
+  id: number;
+  name: string;
+  group_weight: number;
+  rules?: { drop_lowest?: number; drop_highest?: number };
+  assignments?: CanvasAssignment[];
+};
+export type CanvasAnnouncement = { id: number; title: string; message: string; posted_at: string | null };
 export type CanvasModule = { id: number; name: string; position: number; items?: CanvasModuleItem[] };
 export type CanvasFile = {
   id: number;
@@ -159,6 +168,13 @@ export const canvas = {
   pages: (id: number) => getAll<CanvasPage>(`/api/v1/courses/${id}/pages?sort=title`),
   page: (id: number, slug: string) => get<CanvasPage>(`/api/v1/courses/${id}/pages/${encodeURIComponent(slug)}`),
   file: (courseId: number, fileId: number) => get<CanvasFile>(`/api/v1/courses/${courseId}/files/${fileId}`),
+  assignmentGroups: (id: number) =>
+    getAll<CanvasAssignmentGroup>(`/api/v1/courses/${id}/assignment_groups?include[]=assignments&include[]=submission`),
+  /** Announcements posted since a date (Canvas only returns the last two weeks unless asked). */
+  announcements: (id: number, since: string) =>
+    getAll<CanvasAnnouncement>(
+      `/api/v1/announcements?context_codes[]=course_${id}&start_date=${since}&end_date=${new Date().toISOString().slice(0, 10)}&per_page=50`,
+    ),
 };
 
 /** Check a Canvas address + token before saving them. */
